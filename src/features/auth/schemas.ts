@@ -27,11 +27,8 @@ export const registerSchema = z
     city: z.string().trim().min(1, 'City is required'),
     state: z.string().trim().min(1, 'State is required'),
     postalCode: z.string().trim().min(1, 'Postal code is required'),
-    gstNumber: z.string().trim().min(1, 'GST number is required'),
-    businessRegistration: z
-      .string()
-      .trim()
-      .min(1, 'Business registration number is required'),
+    gstNumber: z.string().trim(),
+    businessRegistration: z.string().trim(),
     bank: bankSchema,
   })
   .refine(values => values.password === values.confirmPassword, {

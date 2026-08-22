@@ -9,6 +9,8 @@ interface FormTextInputProps<TFieldValues extends FieldValues>
   control: Control<TFieldValues>;
   name: FieldPath<TFieldValues>;
   label?: string;
+  required?: boolean;
+  leftIcon?: React.ReactNode;
 }
 
 // Thin RHF Controller wrapper around the plain Input — screens that don't

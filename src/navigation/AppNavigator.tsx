@@ -13,22 +13,25 @@ import { useSellerAccess } from '../hooks/useSellerAccess';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 // Three-way root switch: unauthenticated -> Auth stack, authenticated but
-// blocked (pending/suspended/rejected/inactive) -> AccountStatus,
-// authenticated and active -> Main stack. Driven purely by persisted
-// Zustand state, so a 401 clearing that state (see api/client.ts) flips
-// this back to Auth on its own — no imperative navigation needed for that
-// case, resetToAuth() in navigationRef.ts is just belt-and-suspenders for
-// any stale nested-stack state.
+// blocked (pending/suspended/rejected/inactive status) -> AccountStatus,
+// authenticated and active -> Main stack. Gated on status alone, not
+// verification — an active-but-unverified seller still reaches Main;
+// verified-only actions (adding a product, ...) are gated individually
+// via useSellerAccess().isActive instead of blocking the whole app. Driven
+// purely by persisted Zustand state, so a 401 clearing that state (see
+// api/client.ts) flips this back to Auth on its own — no imperative
+// navigation needed for that case, resetToAuth() in navigationRef.ts is
+// just belt-and-suspenders for any stale nested-stack state.
 export function AppNavigator() {
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
-  const { isActive } = useSellerAccess();
+  const { isAccountActive } = useSellerAccess();
 
   return (
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <Stack.Screen name={ROUTES.AUTH} component={AuthNavigator} />
-        ) : !isActive ? (
+        ) : !isAccountActive ? (
           <Stack.Screen name={ROUTES.ACCOUNT_STATUS} component={AccountStatusScreen} />
         ) : (
           <Stack.Screen name={ROUTES.MAIN} component={MainNavigator} />

@@ -14,13 +14,17 @@ import { FontSize, FontWeight } from '../../theme/typography';
 
 interface InputProps extends TextInputProps {
   label?: string;
+  required?: boolean;
   error?: string;
+  leftIcon?: React.ReactNode;
 }
 
 export function Input({
   label,
+  required,
   error,
   secureTextEntry,
+  leftIcon,
   style,
   ...rest
 }: InputProps) {
@@ -33,10 +37,12 @@ export function Input({
       {label ? (
         <Text style={[styles.label, { color: colors.textSecondary }]}>
           {label}
+          {required ? <Text style={{ color: colors.error }}> *</Text> : null}
         </Text>
       ) : null}
 
       <View style={styles.inputRow}>
+        {leftIcon ? <View style={styles.leftIcon}>{leftIcon}</View> : null}
         <TextInput
           {...rest}
           secureTextEntry={secureTextEntry ? hidden : false}
@@ -59,6 +65,7 @@ export function Input({
                   ? colors.inputBorderFocused
                   : colors.inputBorder,
               color: colors.textPrimary,
+              paddingLeft: leftIcon ? 44 : Spacing.md,
               paddingRight: secureTextEntry ? 56 : Spacing.md,
             },
             style,
@@ -106,6 +113,11 @@ const styles = StyleSheet.create({
   toggle: {
     position: 'absolute',
     right: Spacing.md,
+  },
+  leftIcon: {
+    position: 'absolute',
+    left: Spacing.md,
+    zIndex: 1,
   },
   error: {
     fontSize: FontSize.xs,

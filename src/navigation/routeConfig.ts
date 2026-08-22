@@ -22,6 +22,8 @@ export const ROUTES = {
   INVENTORY: 'Inventory',
   SUPPORT: 'Support',
   SETTINGS: 'Settings',
+  ADD_PRODUCT: 'AddProduct',
+  PRODUCT_DETAILS: 'ProductDetails',
 
   // Bottom tabs
   DASHBOARD: 'Dashboard',
@@ -57,6 +59,8 @@ export type MainStackParamList = {
   Inventory: undefined;
   Support: undefined;
   Settings: undefined;
+  AddProduct: undefined;
+  ProductDetails: { productId: string; tab?: 'details' | 'deals' };
 };
 
 // Root switch: unauthenticated -> Auth, authenticated but blocked (pending/

@@ -21,6 +21,8 @@ interface ButtonProps {
   loading?: boolean;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 }
 
 export function Button({
@@ -30,6 +32,8 @@ export function Button({
   loading = false,
   disabled = false,
   style,
+  leftIcon,
+  rightIcon,
 }: ButtonProps) {
   const { colors } = useThemeColors();
   const isDisabled = disabled || loading;
@@ -70,18 +74,24 @@ export function Button({
           color={isDisabled ? colors.buttonDisabledText : textColors[variant]}
         />
       ) : (
-        <Text
-          style={[
-            styles.label,
-            {
-              color: isDisabled
-                ? colors.buttonDisabledText
-                : textColors[variant],
-            },
-          ]}
-        >
-          {label}
-        </Text>
+        <>
+          {leftIcon}
+          <Text
+            style={[
+              styles.label,
+              leftIcon ? styles.labelWithIcon : null,
+              rightIcon ? styles.labelWithIcon : null,
+              {
+                color: isDisabled
+                  ? colors.buttonDisabledText
+                  : textColors[variant],
+              },
+            ]}
+          >
+            {label}
+          </Text>
+          {rightIcon}
+        </>
       )}
     </Pressable>
   );
@@ -91,6 +101,7 @@ const styles = StyleSheet.create({
   base: {
     minHeight: 48,
     borderRadius: Radius.md,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.lg,
@@ -98,5 +109,8 @@ const styles = StyleSheet.create({
   label: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.semibold,
+  },
+  labelWithIcon: {
+    marginLeft: Spacing.sm,
   },
 });

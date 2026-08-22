@@ -1,10 +1,9 @@
-import { NotImplementedError } from '../../utils/NotImplementedError';
+import { request } from '../../api/client';
+import { ENDPOINTS } from '../../api/endpoints';
+import type { Paginated } from '../../types/api';
 
-// Best-effort shape from field names named in the brief — NOT confirmed
-// against the real backend contract yet (/api/v1/seller/products is still
-// being built). Expect this to need a small diff once it lands, not a
-// rewrite: request() usage below already matches every other feature's
-// call convention.
+// Mirrors models/Product.js on the backend exactly (confirmed against
+// controllers/sellerProduct.controller.js + validations/sellerProduct.validation.js).
 export type ProductStatus =
   | 'draft'
   | 'pending_review'
@@ -14,64 +13,149 @@ export type ProductStatus =
   | 'hidden'
   | 'archived';
 
+export type StockStatus = 'in_stock' | 'low_stock' | 'out_of_stock';
+
+export type ProductGender = 'men' | 'women' | 'kids' | 'unisex';
+
 export interface ProductVariant {
   size: string;
   color?: string;
-  stock: number;
   sku?: string;
+  stock: number;
+}
+
+export interface ProductImage {
+  url: string;
+  publicId: string;
+  alt?: string;
 }
 
 export interface Product {
   _id: string;
   name: string;
-  brand: string;
   description: string;
-  tags: string[];
-  attributes: Record<string, string>;
-  color: string;
-  season: string;
-  gender: string;
+  brand: string;
   category: string;
+  group: string[];
   subcategory: string;
-  variants: ProductVariant[];
+  gender: ProductGender;
+  tags: string[];
+  productCollection: string;
+  seller: string;
   costPrice: number;
   sellingPrice: number;
   discountPercent: number;
   finalPrice: number;
-  isReturnable: boolean;
-  tryAndBuy: boolean;
+  variants: ProductVariant[];
+  totalStock: number;
+  stockStatus: StockStatus;
+  color: string;
+  season: string;
+  attributes: Record<string, string>;
+  isFeatured: boolean;
+  isTrending: boolean;
+  isNewArrival: boolean;
+  isLimitedStock: boolean;
   isBogo: boolean;
-  images: string[];
-  video?: string;
+  tryAndBuy: boolean;
+  isReturnable: boolean;
+  dealType: 'none' | 'bogo' | 'tier_amount' | 'tier_percentage' | 'free_shipping';
+  salesCount: number;
+  wishlistCount: number;
+  images: ProductImage[];
+  video: string;
   status: ProductStatus;
   createdAt: string;
   updatedAt: string;
 }
 
-export type CreateProductPayload = Omit<
-  Product,
-  '_id' | 'finalPrice' | 'status' | 'createdAt' | 'updatedAt'
->;
-
-export async function getProducts(): Promise<Product[]> {
-  throw new NotImplementedError('GET /seller/products');
+// Everything the seller can set on create/update — matches
+// createSellerProductSchema (Joi). `status` isn't included: creation
+// always starts at "draft" server-side, and status only moves via
+// updateProductStatus (PATCH /:id/status).
+export interface ProductPayload {
+  name: string;
+  brand: string;
+  category: string;
+  subcategory: string;
+  costPrice: number;
+  sellingPrice: number;
+  description?: string;
+  group?: string[];
+  gender?: ProductGender;
+  tags?: string[];
+  productCollection?: string;
+  discountPercent?: number;
+  variants?: ProductVariant[];
+  color?: string;
+  season?: string;
+  attributes?: Record<string, string>;
+  isFeatured?: boolean;
+  isTrending?: boolean;
+  isNewArrival?: boolean;
+  isLimitedStock?: boolean;
+  isBogo?: boolean;
+  tryAndBuy?: boolean;
+  isReturnable?: boolean;
+  dealType?: Product['dealType'];
+  images?: ProductImage[];
+  video?: string;
 }
 
-export async function getProduct(_id: string): Promise<Product> {
-  throw new NotImplementedError('GET /seller/products/:id');
+// Only draft -> pending_review/archived, pending_review -> draft,
+// rejected -> draft, approved -> published, published -> hidden/archived,
+// hidden -> published/archived are seller-initiated (see
+// constants/productStatus.js SELLER_ALLOWED_TRANSITIONS on the backend).
+// approved/rejected only ever get set by an admin reviewing the product.
+export type SellerSettableStatus = 'draft' | 'pending_review' | 'archived' | 'published' | 'hidden';
+
+export interface GetProductsParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: ProductStatus;
+  stockStatus?: StockStatus;
 }
 
-export async function createProduct(_payload: CreateProductPayload): Promise<Product> {
-  throw new NotImplementedError('POST /seller/products');
+export function getProducts(params: GetProductsParams = {}): Promise<Paginated<Product>> {
+  return request<Paginated<Product>>({
+    url: ENDPOINTS.sellerProducts.list,
+    method: 'GET',
+    params,
+  });
 }
 
-export async function updateProduct(
-  _id: string,
-  _payload: Partial<CreateProductPayload>,
+export function getProduct(id: string): Promise<Product> {
+  return request<Product>({ url: ENDPOINTS.sellerProducts.detail(id), method: 'GET' });
+}
+
+export function createProduct(payload: ProductPayload): Promise<Product> {
+  return request<Product>({
+    url: ENDPOINTS.sellerProducts.list,
+    method: 'POST',
+    data: payload,
+  });
+}
+
+export function updateProduct(id: string, payload: Partial<ProductPayload>): Promise<Product> {
+  return request<Product>({
+    url: ENDPOINTS.sellerProducts.detail(id),
+    method: 'PUT',
+    data: payload,
+  });
+}
+
+export function deleteProduct(id: string): Promise<null> {
+  return request<null>({ url: ENDPOINTS.sellerProducts.detail(id), method: 'DELETE' });
+}
+
+export function updateProductStatus(
+  id: string,
+  status: SellerSettableStatus,
 ): Promise<Product> {
-  throw new NotImplementedError('PATCH /seller/products/:id');
-}
-
-export async function deleteProduct(_id: string): Promise<void> {
-  throw new NotImplementedError('DELETE /seller/products/:id');
+  return request<Product>({
+    url: ENDPOINTS.sellerProducts.status(id),
+    method: 'PATCH',
+    data: { status },
+  });
 }

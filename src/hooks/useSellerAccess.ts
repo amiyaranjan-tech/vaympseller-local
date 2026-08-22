@@ -13,15 +13,23 @@ const BLOCKED_MESSAGES: Record<Exclude<SellerStatus, 'active'>, string> = {
 // before calling a mutation — the backend enforces the same rule via
 // middleware/requireActiveSeller.js, this is purely for UX (hiding/
 // disabling actions), never the source of truth.
+//
+// isAccountActive vs isActive: a seller can be status "active" but
+// isVerified false (an admin can unverify without suspending — see
+// services/seller.service.js#updateVerification on the backend). That
+// seller should still reach the main app (isAccountActive), just with
+// verified-only actions like adding a product gated off (isActive).
 export function useSellerAccess() {
   const seller = useAuthStore(state => state.seller);
 
   const status = seller?.status ?? 'pending';
   const isVerified = seller?.isVerified ?? false;
-  const isActive = status === 'active' && isVerified;
+  const isAccountActive = status === 'active';
+  const isActive = isAccountActive && isVerified;
 
   return {
     seller,
+    isAccountActive,
     isActive,
     isVerified,
     isPending: status === 'pending',

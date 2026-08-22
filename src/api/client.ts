@@ -6,9 +6,12 @@ import { useAuthStore } from '../store/useAuthStore';
 import { ApiError, type ApiEnvelope } from '../types/api';
 import { resetToAuth } from '../navigation/navigationRef';
 
-// Falls back to the emulator-friendly default if react-native-config's
-// native wiring isn't linked yet in a given build — see .env.example.
-const baseURL = Config.API_BASE_URL || 'http://10.0.2.2:5000/api/v1';
+// Falls back to a `localhost` default (paired with `adb reverse tcp:5000
+// tcp:5000`) if react-native-config's native wiring isn't linked yet in a
+// given build — see .env.example. Works for both the emulator and a
+// USB-connected physical device via adb reverse; an emulator without
+// reverse set up needs 10.0.2.2 instead (see .env.example for the tradeoffs).
+const baseURL = Config.API_BASE_URL || 'http://localhost:5000/api/v1';
 
 export const apiClient = axios.create({
   baseURL,
@@ -32,7 +35,11 @@ apiClient.interceptors.response.use(
       error.message ||
       'Something went wrong. Please try again.';
 
-    if (status === 401) {
+    // Only an expired/invalidated *session* should clear state and bounce
+    // to Auth — a 401 on the login/register call itself (wrong password)
+    // is just a rejected credential and must surface as a normal form
+    // error instead of resetting navigation out from under the user.
+    if (status === 401 && error.config?.headers?.Authorization) {
       await clearToken();
       useAuthStore.getState().clearSession();
       resetToAuth();
