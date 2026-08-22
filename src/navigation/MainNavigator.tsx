@@ -12,6 +12,7 @@ import { AddProductScreen } from '../features/products/screens/AddProductScreen'
 import { ProductDetailsScreen } from '../features/products/screens/ProductDetailsScreen';
 import { ShopDetailsScreen } from '../features/shop/screens/ShopDetailsScreen';
 import { OrdersScreen } from '../features/orders/screens/OrdersScreen';
+import { FinanceScreen } from '../features/finance/screens/FinanceScreen';
 import { ComingSoonScreen } from '../components/common/ComingSoonScreen';
 import { useThemeColors } from '../store/themeStore';
 import {
@@ -23,15 +24,12 @@ import {
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
-// Finance tab body and every push screen below except Settings are
-// ComingSoonScreen instances — their backend contracts (/seller/finance,
-// ...) aren't confirmed yet (see each feature's *.api.ts stub). Swapped
-// for a real screen one feature at a time as each contract lands.
-// Products/Shop/Settings/Orders are real UI but still all-zero/local-only
-// placeholder data pending their own contracts (see ShopScreen.tsx,
-// SettingsScreen.tsx and OrdersScreen.tsx — no /seller/orders endpoint
-// exists yet either).
-const FinanceTab = () => <ComingSoonScreen title="Finance" />;
+// Every push screen below except Settings is a ComingSoonScreen instance
+// — their backend contracts aren't confirmed yet (see each feature's
+// *.api.ts stub). Swapped for a real screen one at a time as each
+// contract lands. Products/Shop/Settings/Orders/Finance are real UI but
+// still all-zero/local-only placeholder data pending their own contracts
+// (no /seller/orders or /seller/finance endpoint exists yet).
 
 function MainTabs() {
   const { colors } = useThemeColors();
@@ -63,7 +61,7 @@ function MainTabs() {
       />
       <Tab.Screen
         name={ROUTES.FINANCE}
-        component={FinanceTab}
+        component={FinanceScreen}
         options={{ tabBarIcon: ({ color, size }) => <Wallet color={color} size={size} /> }}
       />
       <Tab.Screen

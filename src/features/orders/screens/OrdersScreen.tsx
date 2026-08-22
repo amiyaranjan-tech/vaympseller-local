@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -9,7 +9,9 @@ import {
   ClipboardList,
   Clock3,
   Filter,
+  MessageCircle,
   Package,
+  PackageCheck,
   Search,
   ShoppingBag,
   ShoppingCart,
@@ -23,6 +25,7 @@ import {
 import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
+import { BottomSheet } from '../../../components/common/BottomSheet';
 import { useThemeColors } from '../../../store/themeStore';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
@@ -66,11 +69,57 @@ const ACTIVITY_ROWS = [
   },
 ] as const;
 
+const HAPPY_CUSTOMER_TIPS = [
+  {
+    key: 'confirm-fast',
+    icon: CircleCheck,
+    tint: (c: Colors) => c.success,
+    title: 'Confirm orders quickly',
+    description: 'Accept new orders within a few hours so customers aren’t left waiting.',
+  },
+  {
+    key: 'update-status',
+    icon: Truck,
+    tint: (c: Colors) => c.warning,
+    title: 'Update status at every step',
+    description: 'Move orders through Processing → Shipped → Delivered as they actually happen.',
+  },
+  {
+    key: 'communicate-delays',
+    icon: MessageCircle,
+    tint: (c: Colors) => c.info,
+    title: 'Communicate delays early',
+    description: 'A heads-up about a delay builds more trust than a late delivery does damage.',
+  },
+  {
+    key: 'pack-securely',
+    icon: PackageCheck,
+    tint: (c: Colors) => c.fulfillmentProcessing,
+    title: 'Package items securely',
+    description: 'Fewer damaged-in-transit returns means fewer refunds and better ratings.',
+  },
+  {
+    key: 'respond-queries',
+    icon: MessageCircle,
+    tint: (c: Colors) => c.success,
+    title: 'Respond to queries fast',
+    description: 'Quick replies to order questions reduce cancellations.',
+  },
+  {
+    key: 'keep-stock-accurate',
+    icon: Package,
+    tint: (c: Colors) => c.error,
+    title: 'Keep stock accurate',
+    description: 'Out-of-stock cancellations after purchase are the fastest way to lose trust.',
+  },
+] as const;
+
 type OrdersNav = BottomTabNavigationProp<MainTabParamList, 'Orders'>;
 
 export function OrdersScreen() {
   const { colors } = useThemeColors();
   const navigation = useNavigation<OrdersNav>();
+  const [tipsSheetOpen, setTipsSheetOpen] = useState(false);
 
   return (
     <Screen>
@@ -136,7 +185,10 @@ export function OrdersScreen() {
               Update order status on time to build trust and get more sales.
             </Text>
           </View>
-          <Pressable style={[styles.tipButton, { backgroundColor: colors.accent10 }]}>
+          <Pressable
+            onPress={() => setTipsSheetOpen(true)}
+            style={[styles.tipButton, { backgroundColor: colors.accent10 }]}
+          >
             <Text style={[styles.tipButtonLabel, { color: colors.accent }]}>Learn more</Text>
           </Pressable>
         </View>
@@ -196,6 +248,39 @@ export function OrdersScreen() {
           })}
         </Card>
       </ScrollView>
+
+      <BottomSheet visible={tipsSheetOpen} onClose={() => setTipsSheetOpen(false)}>
+        <ScrollView style={styles.tipsSheetScroll} showsVerticalScrollIndicator={false}>
+          <Text style={[styles.tipsSheetTitle, { color: colors.textPrimary }]}>
+            Keep your customers happy
+          </Text>
+          <Text style={[styles.tipsSheetSubtitle, { color: colors.textSecondary }]}>
+            A few habits that build trust and get you more repeat sales.
+          </Text>
+
+          {HAPPY_CUSTOMER_TIPS.map(tip => {
+            const Icon = tip.icon;
+            const tint = tip.tint(colors);
+            return (
+              <View key={tip.key} style={styles.tipsSheetRow}>
+                <View style={[styles.tipsSheetIcon, { backgroundColor: `${tint}20` }]}>
+                  <Icon size={18} color={tint} />
+                </View>
+                <View style={styles.tipsSheetContent}>
+                  <Text style={[styles.tipsSheetRowTitle, { color: colors.textPrimary }]}>
+                    {tip.title}
+                  </Text>
+                  <Text style={[styles.tipsSheetRowDescription, { color: colors.textSecondary }]}>
+                    {tip.description}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+
+          <Button label="Got it" onPress={() => setTipsSheetOpen(false)} style={styles.tipsSheetButton} />
+        </ScrollView>
+      </BottomSheet>
     </Screen>
   );
 }
@@ -444,5 +529,46 @@ const styles = StyleSheet.create({
   divider: {
     height: StyleSheet.hairlineWidth,
     marginLeft: Spacing.lg + 44 + Spacing.md,
+  },
+  tipsSheetScroll: {
+    maxHeight: 560,
+  },
+  tipsSheetTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+  },
+  tipsSheetSubtitle: {
+    marginTop: Spacing.xxs,
+    marginBottom: Spacing.lg,
+    fontSize: FontSize.sm,
+  },
+  tipsSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.lg,
+  },
+  tipsSheetIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  tipsSheetContent: {
+    flex: 1,
+  },
+  tipsSheetRowTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+  },
+  tipsSheetRowDescription: {
+    marginTop: 2,
+    fontSize: FontSize.xs,
+    lineHeight: 17,
+  },
+  tipsSheetButton: {
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
 });
