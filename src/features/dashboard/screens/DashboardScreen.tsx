@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
@@ -17,16 +18,20 @@ import {
   ShieldCheck,
   ShieldOff,
   ShoppingBag,
+  Sparkles,
   Store,
   Tag,
   TrendingUp,
+  X,
 } from 'lucide-react-native';
 
 import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
 import { useThemeColors } from '../../../store/themeStore';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { useToast } from '../../../components/feedback/Toast';
 import { useMe } from '../../auth/hooks/useMe';
+import { updateShopStatus } from '../../shop/shop.api';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import {
@@ -70,16 +75,57 @@ type DashboardNav = BottomTabNavigationProp<MainTabParamList, 'Dashboard'>;
 export function DashboardScreen() {
   const { colors } = useThemeColors();
   const navigation = useNavigation<DashboardNav>();
+  const toast = useToast();
+  const queryClient = useQueryClient();
   const seller = useAuthStore(state => state.seller);
+  const updateSeller = useAuthStore(state => state.updateSeller);
   useMe();
 
   const shopName = seller?.shopName ?? 'your shop';
   const isOpen = seller?.shopStatus === 'open';
   const isVerified = seller?.isVerified ?? false;
   const [showVerifyInfo, setShowVerifyInfo] = useState(false);
+  const [motivationDismissed, setMotivationDismissed] = useState(false);
   const verifyTint = isVerified ? colors.success : colors.warning;
   const verifyTintBg = isVerified ? colors.success10 : colors.warning10;
   const VerifyIcon = isVerified ? ShieldCheck : ShieldOff;
+
+  const shopStatusMutation = useMutation({
+    mutationFn: (nextOpen: boolean) =>
+      updateShopStatus({ shopStatusMode: 'manual', shopStatus: nextOpen ? 'open' : 'closed' }),
+    onSuccess: updated => {
+      updateSeller(updated);
+      void queryClient.invalidateQueries({ queryKey: ['seller-auth', 'me'] });
+      toast.show({
+        type: 'success',
+        title: updated.shopStatus === 'open' ? 'Shop is now open' : 'Shop is now closed',
+      });
+      if (updated.shopStatus === 'open') setMotivationDismissed(false);
+    },
+    onError: (error: Error) => {
+      toast.show({ type: 'error', title: "Couldn't update shop status", message: error.message });
+    },
+  });
+
+  // Re-arm the nudge every time the shop transitions to closed, so
+  // dismissing it only silences the current closed stretch, not every
+  // future one.
+  useEffect(() => {
+    if (!isOpen) setMotivationDismissed(false);
+  }, [isOpen]);
+
+  const pulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (isOpen || motivationDismissed) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.5, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isOpen, motivationDismissed, pulse]);
 
   return (
     <Screen>
@@ -95,28 +141,60 @@ export function DashboardScreen() {
           </View>
 
           <View style={styles.headerActions}>
-            <View
-              style={[
-                styles.openPill,
-                {
-                  backgroundColor: isOpen ? colors.success10 : colors.neutral10,
-                },
-              ]}
-            >
+            <View style={styles.shopToggleWrap}>
               <View
                 style={[
-                  styles.openDot,
-                  { backgroundColor: isOpen ? colors.success : colors.neutral },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.openLabel,
-                  { color: isOpen ? colors.success : colors.neutral },
+                  styles.openPill,
+                  { backgroundColor: isOpen ? colors.success10 : colors.neutral10 },
                 ]}
               >
-                {isOpen ? 'OPEN' : 'CLOSED'}
-              </Text>
+                <Text
+                  style={[styles.openLabel, { color: isOpen ? colors.success : colors.neutral }]}
+                >
+                  {isOpen ? 'OPEN' : 'CLOSED'}
+                </Text>
+                <Switch
+                  value={isOpen}
+                  onValueChange={next => shopStatusMutation.mutate(next)}
+                  disabled={shopStatusMutation.isPending}
+                  trackColor={{ false: colors.buttonSecondaryBg, true: colors.success }}
+                  thumbColor="#FFFFFF"
+                  style={styles.shopSwitch}
+                />
+              </View>
+
+              {!isOpen && !motivationDismissed && (
+                <Animated.View
+                  style={[
+                    styles.motivationCard,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                      opacity: pulse,
+                    },
+                  ]}
+                >
+                  <View style={[styles.motivationArrow, { backgroundColor: colors.card, borderColor: colors.border }]} />
+                  <View style={[styles.motivationIcon, { backgroundColor: colors.warning10 }]}>
+                    <Sparkles size={14} color={colors.warning} />
+                  </View>
+                  <View style={styles.motivationTextBlock}>
+                    <Text style={[styles.motivationTitle, { color: colors.textPrimary }]}>
+                      Open your shop
+                    </Text>
+                    <Text style={[styles.motivationBody, { color: colors.textSecondary }]}>
+                      Customers can't order while you're closed. Open up to start getting sales.
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => setMotivationDismissed(true)}
+                    hitSlop={8}
+                    style={styles.motivationClose}
+                  >
+                    <X size={14} color={colors.textLight} />
+                  </Pressable>
+                </Animated.View>
+              )}
             </View>
 
             <Pressable
@@ -293,23 +371,72 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
   },
+  shopToggleWrap: {
+    zIndex: 20,
+  },
   openPill: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
+    paddingVertical: Spacing.xxs,
     gap: Spacing.xs,
   },
-  openDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  shopSwitch: {
+    transform: [{ scale: 0.75 }],
+    marginRight: -Spacing.xs,
   },
   openLabel: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.bold,
     letterSpacing: 0.4,
+  },
+  motivationCard: {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    marginTop: Spacing.md,
+    width: 230,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    elevation: 6,
+  },
+  motivationArrow: {
+    position: 'absolute',
+    top: -6,
+    right: Spacing.lg,
+    width: 12,
+    height: 12,
+    borderLeftWidth: 1,
+    borderTopWidth: 1,
+    transform: [{ rotate: '45deg' }],
+  },
+  motivationIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  motivationTextBlock: {
+    flex: 1,
+  },
+  motivationTitle: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+  },
+  motivationBody: {
+    marginTop: 2,
+    fontSize: FontSize.xxs,
+    lineHeight: 15,
+  },
+  motivationClose: {
+    marginLeft: Spacing.xs,
+    marginTop: 1,
   },
   bellButton: {
     width: 40,

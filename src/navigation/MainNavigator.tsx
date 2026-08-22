@@ -12,6 +12,7 @@ import { AddProductScreen } from '../features/products/screens/AddProductScreen'
 import { ProductDetailsScreen } from '../features/products/screens/ProductDetailsScreen';
 import { ShopDetailsScreen } from '../features/shop/screens/ShopDetailsScreen';
 import { OrdersScreen } from '../features/orders/screens/OrdersScreen';
+import { OrderActivityScreen } from '../features/orders/screens/OrderActivityScreen';
 import { FinanceScreen } from '../features/finance/screens/FinanceScreen';
 import { ComingSoonScreen } from '../components/common/ComingSoonScreen';
 import { useThemeColors } from '../store/themeStore';
@@ -92,6 +93,7 @@ export function MainNavigator() {
       <Stack.Screen name={ROUTES.ADD_PRODUCT} component={AddProductScreen} />
       <Stack.Screen name={ROUTES.PRODUCT_DETAILS} component={ProductDetailsScreen} />
       <Stack.Screen name={ROUTES.SHOP_DETAILS} component={ShopDetailsScreen} />
+      <Stack.Screen name={ROUTES.ORDER_ACTIVITY} component={OrderActivityScreen} />
     </Stack.Navigator>
   );
 }

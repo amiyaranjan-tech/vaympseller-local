@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Bell,
   CircleCheck,
@@ -29,7 +30,7 @@ import { BottomSheet } from '../../../components/common/BottomSheet';
 import { useThemeColors } from '../../../store/themeStore';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
-import { ROUTES, type MainTabParamList } from '../../../navigation/routeConfig';
+import { ROUTES, type MainStackParamList, type MainTabParamList } from '../../../navigation/routeConfig';
 
 type Colors = ReturnType<typeof useThemeColors>['colors'];
 
@@ -119,6 +120,7 @@ type OrdersNav = BottomTabNavigationProp<MainTabParamList, 'Orders'>;
 export function OrdersScreen() {
   const { colors } = useThemeColors();
   const navigation = useNavigation<OrdersNav>();
+  const mainStack = navigation.getParent<NativeStackNavigationProp<MainStackParamList>>();
   const [tipsSheetOpen, setTipsSheetOpen] = useState(false);
 
   return (
@@ -219,9 +221,12 @@ export function OrdersScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Recent activity</Text>
-          <Text style={[styles.viewAll, { color: colors.textLink }]}>View all</Text>
+          <Pressable onPress={() => mainStack?.navigate(ROUTES.ORDER_ACTIVITY)}>
+            <Text style={[styles.viewAll, { color: colors.textLink }]}>View all</Text>
+          </Pressable>
         </View>
 
+        <Pressable onPress={() => mainStack?.navigate(ROUTES.ORDER_ACTIVITY)}>
         <Card style={styles.activityCard}>
           {ACTIVITY_ROWS.map((row, index) => {
             const Icon = row.icon;
@@ -247,6 +252,7 @@ export function OrdersScreen() {
             );
           })}
         </Card>
+        </Pressable>
       </ScrollView>
 
       <BottomSheet visible={tipsSheetOpen} onClose={() => setTipsSheetOpen(false)}>

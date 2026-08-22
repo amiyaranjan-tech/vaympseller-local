@@ -4,6 +4,8 @@ import type {
   SellerImage,
   SellerProfile,
   SellerWorkingHours,
+  ShopStatus,
+  ShopStatusMode,
   WorkingDay,
 } from '../../types/seller';
 
@@ -41,6 +43,24 @@ export async function updateShopProfile(payload: UpdateShopPayload): Promise<Sel
   const result = await request<{ seller: SellerProfile }>({
     url: '/seller/shop',
     method: 'PUT',
+    data: payload,
+  });
+  return result.seller;
+}
+
+// Mirrors validations/sellerShop.validation.js#updateShopStatusSchema —
+// PATCH /seller/shop/status. `shopStatus` is only required when
+// shopStatusMode is "manual" (a manual open/close override); "auto" lets
+// the backend derive status from workingHours instead.
+export interface UpdateShopStatusPayload {
+  shopStatusMode: ShopStatusMode;
+  shopStatus?: ShopStatus;
+}
+
+export async function updateShopStatus(payload: UpdateShopStatusPayload): Promise<SellerProfile> {
+  const result = await request<{ seller: SellerProfile }>({
+    url: '/seller/shop/status',
+    method: 'PATCH',
     data: payload,
   });
   return result.seller;
