@@ -18,7 +18,6 @@ import {
   Settings,
   ShieldCheck,
   ShoppingBag,
-  Star,
   Store,
   Tag,
   TrendingUp,
@@ -293,17 +292,6 @@ export function ShopScreen() {
                   <Text style={[styles.metaValue, { color: colors.textPrimary }]}>{shopId}</Text>
                 </View>
               </View>
-              <View style={styles.shopCardMeta}>
-                <View style={[styles.metaIcon, { backgroundColor: colors.warning10 }]}>
-                  <Star size={14} color={colors.warning} />
-                </View>
-                <View>
-                  <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Shop Rating</Text>
-                  <Text style={[styles.metaValue, { color: colors.textPrimary }]}>
-                    {'-- (no reviews yet)'}
-                  </Text>
-                </View>
-              </View>
             </View>
           </Card>
         </Pressable>
@@ -348,9 +336,11 @@ export function ShopScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Shop Performance</Text>
           <Text style={[styles.viewAll, { color: colors.textLink }]}>View all</Text>
         </View>
-        {/* Views/visitors/followers/rating have no backing endpoint yet
-            (see features/shop/api stub) — zero placeholders like the
-            Dashboard and Products screens use until that contract lands. */}
+        {/* Views/visitors/followers have no backing endpoint yet (see
+            features/shop/api stub) — zero placeholders like the
+            Dashboard and Products screens use until that contract lands.
+            No shop rating/reviews concept in this app — removed per
+            product decision, not just an unbuilt endpoint. */}
         <View style={styles.perfGrid}>
           <PerfTile
             icon={<Eye size={20} color={colors.fulfillmentProcessing} />}
@@ -372,13 +362,6 @@ export function ShopScreen() {
             value="0"
             label="Followers"
             caption="-- vs last 7 days"
-          />
-          <PerfTile
-            icon={<Star size={20} color={colors.warning} />}
-            tint={colors.warning}
-            value="--"
-            label="Rating"
-            caption="0 reviews"
           />
         </View>
 
