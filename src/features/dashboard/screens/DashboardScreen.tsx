@@ -32,6 +32,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useToast } from '../../../components/feedback/Toast';
 import { useMe } from '../../auth/hooks/useMe';
 import { updateShopStatus } from '../../shop/shop.api';
+import { useUnreadNotificationsCount } from '../../notifications/useUnreadCount';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import {
@@ -79,6 +80,7 @@ export function DashboardScreen() {
   const queryClient = useQueryClient();
   const seller = useAuthStore(state => state.seller);
   const updateSeller = useAuthStore(state => state.updateSeller);
+  const unreadCount = useUnreadNotificationsCount();
   useMe();
 
   const shopName = seller?.shopName ?? 'your shop';
@@ -206,7 +208,9 @@ export function DashboardScreen() {
               style={[styles.bellButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
               <Bell size={20} color={colors.textPrimary} />
-              <View style={[styles.bellDot, { backgroundColor: colors.warning }]} />
+              {unreadCount > 0 && (
+                <View style={[styles.bellDot, { backgroundColor: colors.warning }]} />
+              )}
             </Pressable>
           </View>
         </View>

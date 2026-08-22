@@ -31,6 +31,7 @@ import { Card } from '../../../components/common/Card';
 import { Badge } from '../../../components/common/Badge';
 import { useThemeColors } from '../../../store/themeStore';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { useUnreadNotificationsCount } from '../../notifications/useUnreadCount';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import {
@@ -149,6 +150,7 @@ export function ShopScreen() {
   const goToSettings = () => mainStack?.navigate(ROUTES.SETTINGS);
   const goToShopDetails = () => mainStack?.navigate(ROUTES.SHOP_DETAILS);
   const seller = useAuthStore(state => state.seller);
+  const unreadCount = useUnreadNotificationsCount();
 
   const isOpen = seller?.shopStatus === 'open';
   const shopName = seller?.shopName ?? 'Your shop';
@@ -235,7 +237,9 @@ export function ShopScreen() {
               style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
               <Bell size={20} color={colors.textPrimary} />
-              <View style={[styles.bellDot, { backgroundColor: colors.warning }]} />
+              {unreadCount > 0 && (
+                <View style={[styles.bellDot, { backgroundColor: colors.warning }]} />
+              )}
             </Pressable>
             <Pressable
               onPress={goToSettings}

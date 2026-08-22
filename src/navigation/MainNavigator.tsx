@@ -14,6 +14,7 @@ import { ShopDetailsScreen } from '../features/shop/screens/ShopDetailsScreen';
 import { OrdersScreen } from '../features/orders/screens/OrdersScreen';
 import { OrderActivityScreen } from '../features/orders/screens/OrderActivityScreen';
 import { FinanceScreen } from '../features/finance/screens/FinanceScreen';
+import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
 import { ComingSoonScreen } from '../components/common/ComingSoonScreen';
 import { useThemeColors } from '../store/themeStore';
 import {
@@ -84,7 +85,7 @@ export function MainNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name={ROUTES.MAIN_TABS} component={MainTabs} />
-      <Stack.Screen name={ROUTES.NOTIFICATIONS} component={withBack('Notifications')} />
+      <Stack.Screen name={ROUTES.NOTIFICATIONS} component={NotificationsScreen} />
       <Stack.Screen name={ROUTES.RETURNS} component={withBack('Returns')} />
       <Stack.Screen name={ROUTES.OFFERS} component={withBack('Offers')} />
       <Stack.Screen name={ROUTES.INVENTORY} component={withBack('Inventory')} />
