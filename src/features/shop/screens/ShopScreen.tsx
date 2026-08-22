@@ -146,6 +146,8 @@ export function ShopScreen() {
   const { colors } = useThemeColors();
   const navigation = useNavigation<ShopNav>();
   const mainStack = navigation.getParent<NativeStackNavigationProp<MainStackParamList>>();
+  const goToSettings = () => mainStack?.navigate(ROUTES.SETTINGS);
+  const goToShopDetails = () => mainStack?.navigate(ROUTES.SHOP_DETAILS);
   const seller = useAuthStore(state => state.seller);
 
   const isOpen = seller?.shopStatus === 'open';
@@ -169,6 +171,7 @@ export function ShopScreen() {
       title: 'Shop Profile',
       description: 'Name, logo and contact details',
       completed: Boolean(seller?.shopName && seller?.logo?.url),
+      onPress: goToShopDetails,
     },
     {
       key: 'business',
@@ -177,16 +180,20 @@ export function ShopScreen() {
       title: 'Business Information',
       description: 'Business details and documents',
       completed: Boolean(seller?.gstNumber && seller?.businessRegistration),
+      // GST/business registration aren't in PUT /seller/shop's editable
+      // fields (see shop.api.ts) — no dedicated screen for these yet.
+      onPress: goToSettings,
     },
     {
       key: 'shipping',
       icon: <Truck size={20} color={colors.info} />,
       tint: colors.info,
       title: 'Shipping Settings',
-      description: 'Delivery zones and shipping options',
+      description: 'Working days and hours',
       completed: Boolean(
         seller?.workingHours?.open && seller?.workingHours?.close && seller?.workingDays?.length,
       ),
+      onPress: goToShopDetails,
     },
     {
       key: 'bank',
@@ -195,6 +202,7 @@ export function ShopScreen() {
       title: 'Bank Details',
       description: 'Add bank account for payouts',
       completed: Boolean(seller?.bank?.accountNumber),
+      onPress: goToShopDetails,
     },
     {
       // No policies field exists on the seller model yet, so this step
@@ -205,11 +213,11 @@ export function ShopScreen() {
       title: 'Shop Policies',
       description: 'Returns, privacy and terms',
       completed: false,
+      onPress: goToSettings,
     },
   ];
   const completedCount = setupItems.filter(item => item.completed).length;
 
-  const goToSettings = () => mainStack?.navigate(ROUTES.SETTINGS);
 
   return (
     <Screen>
@@ -238,7 +246,7 @@ export function ShopScreen() {
           </View>
         </View>
 
-        <Pressable onPress={goToSettings}>
+        <Pressable onPress={() => mainStack?.navigate(ROUTES.SHOP_DETAILS)}>
           <Card style={styles.shopCard}>
             <View style={styles.shopCardTop}>
               {seller?.logo?.url ? (
@@ -367,7 +375,7 @@ export function ShopScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Shop Setup</Text>
-          <Pressable onPress={goToSettings}>
+          <Pressable onPress={goToShopDetails}>
             <Text style={[styles.viewAll, { color: colors.textLink }]}>Manage</Text>
           </Pressable>
         </View>
@@ -381,7 +389,7 @@ export function ShopScreen() {
               description={item.description}
               completed={item.completed}
               isLast={index === setupItems.length - 1}
-              onPress={goToSettings}
+              onPress={item.onPress}
               colors={colors}
             />
           ))}
@@ -416,7 +424,7 @@ export function ShopScreen() {
             icon={<ImageIcon size={22} color={colors.success} />}
             tint={colors.success}
             label="Edit Shop Banner"
-            onPress={goToSettings}
+            onPress={() => mainStack?.navigate(ROUTES.SHOP_DETAILS, { openBranding: true })}
             colors={colors}
           />
         </View>

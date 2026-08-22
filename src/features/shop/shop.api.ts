@@ -1,29 +1,47 @@
-import { NotImplementedError } from '../../utils/NotImplementedError';
+import { request } from '../../api/client';
+import type {
+  SellerBank,
+  SellerImage,
+  SellerProfile,
+  SellerWorkingHours,
+  WorkingDay,
+} from '../../types/seller';
 
-import type { SellerProfile, SellerWorkingHours, WorkingDay } from '../../types/seller';
-
-// /api/v1/seller/shop contract not confirmed yet — this is the
-// shop-profile-edit surface (logo/cover/hours/description), distinct from
-// seller-auth's /me (read-only session bootstrap).
-export type ShopProfileUpdatePayload = Partial<
-  Pick<
-    SellerProfile,
-    'shopName' | 'description' | 'shopStatusMode'
-  >
-> & {
+// Mirrors validations/sellerShop.validation.js#updateShopSchema on the
+// backend — PUT /seller/shop. email/gstNumber/businessRegistration are
+// deliberately not editable here (not in that schema). Editing while
+// status is "rejected" atomically resubmits it (status -> "pending",
+// rejectionReason cleared) — see services/sellerShop.service.js#update;
+// no separate "submit for review" call needed, it's automatic.
+export interface UpdateShopPayload {
+  shopName?: string;
+  ownerName?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  description?: string;
+  logo?: SellerImage;
+  cover?: SellerImage;
   workingDays?: WorkingDay[];
   workingHours?: SellerWorkingHours;
-};
-
-export async function updateShopProfile(
-  _payload: ShopProfileUpdatePayload,
-): Promise<SellerProfile> {
-  throw new NotImplementedError('PATCH /seller/shop');
+  bank?: SellerBank;
 }
 
-export async function uploadShopImage(
-  _kind: 'logo' | 'cover',
-  _fileUri: string,
-): Promise<{ url: string; publicId: string }> {
-  throw new NotImplementedError('POST /seller/uploads/sign');
+export async function getShopProfile(): Promise<SellerProfile> {
+  const result = await request<{ seller: SellerProfile }>({
+    url: '/seller/shop',
+    method: 'GET',
+  });
+  return result.seller;
+}
+
+export async function updateShopProfile(payload: UpdateShopPayload): Promise<SellerProfile> {
+  const result = await request<{ seller: SellerProfile }>({
+    url: '/seller/shop',
+    method: 'PUT',
+    data: payload,
+  });
+  return result.seller;
 }

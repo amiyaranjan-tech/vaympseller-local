@@ -13,6 +13,33 @@ type Colors = ReturnType<typeof useThemeColors>['colors'];
 // (AddProductScreen, ProductDetailsScreen) — pulled out once a second
 // screen needed the same label/counted-input/select/checkbox shapes.
 
+// Icon + title + description row that opens a Card section — matches
+// RegisterScreen's own (still-local) SectionHeader; pulled out here once
+// ShopDetailsScreen needed the same shape.
+export function CardSectionHeader({
+  icon,
+  title,
+  description,
+  colors,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  colors: Colors;
+}) {
+  return (
+    <View style={styles.cardSectionHeader}>
+      <View style={[styles.cardSectionIcon, { backgroundColor: colors.accent10 }]}>{icon}</View>
+      <View style={styles.cardSectionHeaderText}>
+        <Text style={[styles.cardSectionTitle, { color: colors.textPrimary }]}>{title}</Text>
+        <Text style={[styles.cardSectionDescription, { color: colors.textSecondary }]}>
+          {description}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export function FieldLabel({
   label,
   required,
@@ -183,6 +210,30 @@ export function FlagCheckbox({
 }
 
 const styles = StyleSheet.create({
+  cardSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.lg,
+  },
+  cardSectionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  cardSectionHeaderText: {
+    flex: 1,
+  },
+  cardSectionTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+  },
+  cardSectionDescription: {
+    marginTop: 1,
+    fontSize: FontSize.xs,
+  },
   fieldLabel: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.medium,

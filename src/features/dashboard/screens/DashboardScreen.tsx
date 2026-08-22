@@ -65,40 +65,6 @@ function StatTile({
   );
 }
 
-function TodoRow({
-  icon,
-  tint,
-  title,
-  description,
-  isLast,
-  onPress,
-  colors,
-}: {
-  icon: React.ReactNode;
-  tint: string;
-  title: string;
-  description: string;
-  isLast: boolean;
-  onPress?: () => void;
-  colors: Colors;
-}) {
-  return (
-    <View>
-      <Pressable onPress={onPress} style={styles.todoRow}>
-        <View style={[styles.todoIcon, { backgroundColor: `${tint}20` }]}>{icon}</View>
-        <View style={styles.todoContent}>
-          <Text style={[styles.todoTitle, { color: colors.textPrimary }]}>{title}</Text>
-          <Text style={[styles.todoDescription, { color: colors.textSecondary }]}>
-            {description}
-          </Text>
-        </View>
-        <ChevronRight size={20} color={colors.textLight} />
-      </Pressable>
-      {!isLast && <View style={[styles.divider, { backgroundColor: colors.divider }]} />}
-    </View>
-  );
-}
-
 type DashboardNav = BottomTabNavigationProp<MainTabParamList, 'Dashboard'>;
 
 export function DashboardScreen() {
@@ -276,46 +242,6 @@ export function DashboardScreen() {
           <Plus size={18} color={colors.accent} />
         </Pressable>
 
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRow}>
-            <View style={[styles.sectionIcon, { backgroundColor: colors.warning10 }]}>
-              <ClipboardList size={16} color={colors.warning} />
-            </View>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-              Today's to-do list
-            </Text>
-          </View>
-          <Text style={[styles.viewAll, { color: colors.textSecondary }]}>View all</Text>
-        </View>
-
-        <Card style={styles.todoCard}>
-          <TodoRow
-            icon={<Tag size={20} color={colors.info} />}
-            tint={colors.info}
-            title="Add your first product"
-            description="Start listing and reach more customers"
-            isLast={false}
-            onPress={() => navigation.navigate(ROUTES.PRODUCTS)}
-            colors={colors}
-          />
-          <TodoRow
-            icon={<Store size={20} color={colors.success} />}
-            tint={colors.success}
-            title="Complete shop profile"
-            description="Add shop details to build trust"
-            isLast={false}
-            onPress={() => navigation.navigate(ROUTES.SHOP)}
-            colors={colors}
-          />
-          <TodoRow
-            icon={<ShieldCheck size={20} color={colors.warning} />}
-            tint={colors.warning}
-            title="Verify your documents"
-            description="Get verified and unlock all features"
-            isLast
-            colors={colors}
-          />
-        </Card>
 
         <Card style={styles.chartCard}>
           <View style={styles.chartText}>

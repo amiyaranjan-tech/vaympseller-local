@@ -10,6 +10,8 @@ import { ShopScreen } from '../features/shop/screens/ShopScreen';
 import { SettingsScreen } from '../features/settings/screens/SettingsScreen';
 import { AddProductScreen } from '../features/products/screens/AddProductScreen';
 import { ProductDetailsScreen } from '../features/products/screens/ProductDetailsScreen';
+import { ShopDetailsScreen } from '../features/shop/screens/ShopDetailsScreen';
+import { OrdersScreen } from '../features/orders/screens/OrdersScreen';
 import { ComingSoonScreen } from '../components/common/ComingSoonScreen';
 import { useThemeColors } from '../store/themeStore';
 import {
@@ -21,15 +23,14 @@ import {
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
-// Orders/Finance tab bodies and every push screen below except Settings
-// are ComingSoonScreen instances — their backend contracts
-// (/seller/orders, /seller/finance, ...) aren't confirmed yet (see each
-// feature's *.api.ts stub). Swapped for a real screen one feature at a
-// time as each contract lands. Products is fully wired to the real
-// /seller/products API (see products.api.ts); Shop and Settings are real
-// UI but still all-zero/local-only placeholder data pending their own
-// contracts (see ShopScreen.tsx and SettingsScreen.tsx).
-const OrdersTab = () => <ComingSoonScreen title="Orders" />;
+// Finance tab body and every push screen below except Settings are
+// ComingSoonScreen instances — their backend contracts (/seller/finance,
+// ...) aren't confirmed yet (see each feature's *.api.ts stub). Swapped
+// for a real screen one feature at a time as each contract lands.
+// Products/Shop/Settings/Orders are real UI but still all-zero/local-only
+// placeholder data pending their own contracts (see ShopScreen.tsx,
+// SettingsScreen.tsx and OrdersScreen.tsx — no /seller/orders endpoint
+// exists yet either).
 const FinanceTab = () => <ComingSoonScreen title="Finance" />;
 
 function MainTabs() {
@@ -57,7 +58,7 @@ function MainTabs() {
       />
       <Tab.Screen
         name={ROUTES.ORDERS}
-        component={OrdersTab}
+        component={OrdersScreen}
         options={{ tabBarIcon: ({ color, size }) => <ShoppingBag color={color} size={size} /> }}
       />
       <Tab.Screen
@@ -92,6 +93,7 @@ export function MainNavigator() {
       <Stack.Screen name={ROUTES.SETTINGS} component={SettingsScreen} />
       <Stack.Screen name={ROUTES.ADD_PRODUCT} component={AddProductScreen} />
       <Stack.Screen name={ROUTES.PRODUCT_DETAILS} component={ProductDetailsScreen} />
+      <Stack.Screen name={ROUTES.SHOP_DETAILS} component={ShopDetailsScreen} />
     </Stack.Navigator>
   );
 }
