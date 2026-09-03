@@ -9,6 +9,7 @@ import { navigationRef } from './navigationRef';
 import { ROUTES, type RootStackParamList } from './routeConfig';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSellerAccess } from '../hooks/useSellerAccess';
+import { useMe } from '../features/auth/hooks/useMe';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -25,6 +26,15 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export function AppNavigator() {
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const { isAccountActive } = useSellerAccess();
+
+  // Was built for exactly this ("status may have changed server-side...
+  // since last launch" — see its own doc comment) but was never actually
+  // called anywhere near this gate, so a seller verified/suspended/etc.
+  // after their last app launch never saw it reflected until logging out
+  // and back in. Mounted once at the root, so it re-confirms on every
+  // fresh launch; AccountStatusScreen also exposes a manual refresh for
+  // someone sitting on that screen without relaunching.
+  useMe();
 
   return (
     <NavigationContainer ref={navigationRef}>

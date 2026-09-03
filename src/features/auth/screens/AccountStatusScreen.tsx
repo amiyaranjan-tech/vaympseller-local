@@ -5,6 +5,7 @@ import {
   Clock3,
   FileText,
   LogOut,
+  RefreshCw,
   ShieldCheck,
 } from 'lucide-react-native';
 
@@ -16,6 +17,7 @@ import { Spacing } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import { useSellerAccess } from '../../../hooks/useSellerAccess';
 import { useLogout } from '../hooks/useAuthMutations';
+import { useMe } from '../hooks/useMe';
 
 export function AccountStatusScreen() {
   const { colors } = useThemeColors();
@@ -30,6 +32,7 @@ export function AccountStatusScreen() {
   } = useSellerAccess();
 
   const logout = useLogout();
+  const me = useMe();
 
   const tone: BadgeTone =
     isRejected || isSuspended ? 'error' : isInactive ? 'neutral' : 'warning';
@@ -186,6 +189,19 @@ export function AccountStatusScreen() {
             </Text>
           </View>
         )}
+
+        <Button
+          label="Refresh status"
+          variant="outline"
+          onPress={() => me.refetch()}
+          loading={me.isFetching}
+          style={styles.refresh}
+          leftIcon={
+            !me.isFetching ? (
+              <RefreshCw size={20} color={colors.primary} />
+            ) : undefined
+          }
+        />
 
         <Button
           label="Log out"
@@ -377,9 +393,15 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 
-  logout: {
+  refresh: {
     width: '100%',
     marginTop: Spacing.xxl,
+    minHeight: 56,
+  },
+
+  logout: {
+    width: '100%',
+    marginTop: Spacing.md,
     minHeight: 56,
   },
 });
