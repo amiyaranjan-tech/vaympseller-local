@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification-tray icon tint — same brand purple the Consumer app
+         uses (theme/color.ts's `accent` here is a different, seller-app-
+         local blue; this one represents the shared "Vaymp" brand in the
+         notification shade, not this app's own UI palette). -->
+    <color name="notification_color">#4342FF</color>
+</resources>

@@ -54,7 +54,7 @@ export type MainTabParamList = {
 };
 
 export type MainStackParamList = {
-  MainTabs: undefined;
+  MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   Notifications: undefined;
   Returns: undefined;
   Offers: undefined;

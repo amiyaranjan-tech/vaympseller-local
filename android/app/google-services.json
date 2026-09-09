@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "67622267408",
+    "project_id": "vaymp-app",
+    "storage_bucket": "vaymp-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:67622267408:android:ea4374a6a03f0657cf7895",
+        "android_client_info": {
+          "package_name": "com.vaympmobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-t0rZo5g0zs-W3WE-E9P16BEEp8qQFgY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:67622267408:android:90e58fd1592c59cfcf7895",
+        "android_client_info": {
+          "package_name": "com.vaympseller"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-t0rZo5g0zs-W3WE-E9P16BEEp8qQFgY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

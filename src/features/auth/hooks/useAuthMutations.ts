@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { setToken, clearToken } from '../../../utils/tokenStorage';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { unregisterCurrentDevice } from '../../../services/notifications/notificationService';
 import * as authApi from '../api/auth.api';
 import type {
   ChangePasswordPayload,
@@ -66,6 +67,9 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => authApi.logout(),
     onSettled: async () => {
+      // Must run before clearToken() below — it still needs a valid token
+      // to authenticate the unregister call itself.
+      await unregisterCurrentDevice();
       await clearToken();
       clearSession();
       queryClient.clear();
@@ -80,6 +84,7 @@ export function useLogoutAll() {
   return useMutation({
     mutationFn: () => authApi.logoutAll(),
     onSettled: async () => {
+      await unregisterCurrentDevice();
       await clearToken();
       clearSession();
       queryClient.clear();

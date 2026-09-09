@@ -1,37 +1,31 @@
 import React from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Bell,
-  Building2,
   CalendarDays,
   ChevronRight,
-  CircleCheck,
   ClipboardList,
-  Eye,
-  Heart,
   Image as ImageIcon,
-  Landmark,
   Percent,
   Settings,
   ShieldCheck,
   ShoppingBag,
   Store,
   Tag,
-  TrendingUp,
-  TriangleAlert,
-  Truck,
-  Users,
 } from 'lucide-react-native';
 
 import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
 import { Badge } from '../../../components/common/Badge';
+import { Skeleton } from '../../../components/feedback/Skeleton';
 import { useThemeColors } from '../../../store/themeStore';
 import { useAuthStore } from '../../../store/useAuthStore';
-import { useUnreadNotificationsCount } from '../../notifications/useUnreadCount';
+import { getNotifications, markNotificationRead } from '../../notifications/notifications.api';
+import { NotificationRow } from '../../notifications/notificationDisplay';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import {
@@ -41,81 +35,6 @@ import {
 } from '../../../navigation/routeConfig';
 
 type Colors = ReturnType<typeof useThemeColors>['colors'];
-
-function PerfTile({
-  icon,
-  tint,
-  value,
-  label,
-  caption,
-}: {
-  icon: React.ReactNode;
-  tint: string;
-  value: string;
-  label: string;
-  caption: string;
-}) {
-  const { colors } = useThemeColors();
-  return (
-    <Card style={styles.perfTile}>
-      <View style={[styles.perfIcon, { backgroundColor: `${tint}20` }]}>{icon}</View>
-      <Text style={[styles.perfValue, { color: colors.textPrimary }]}>{value}</Text>
-      <Text style={[styles.perfLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <Text style={[styles.perfCaption, { color: colors.success }]}>{caption}</Text>
-    </Card>
-  );
-}
-
-function SetupRow({
-  icon,
-  tint,
-  title,
-  description,
-  completed,
-  isLast,
-  onPress,
-  colors,
-}: {
-  icon: React.ReactNode;
-  tint: string;
-  title: string;
-  description: string;
-  completed: boolean;
-  isLast: boolean;
-  onPress: () => void;
-  colors: Colors;
-}) {
-  return (
-    <View>
-      <Pressable onPress={onPress} style={styles.setupRow}>
-        <View style={[styles.setupIcon, { backgroundColor: `${tint}20` }]}>{icon}</View>
-        <View style={styles.setupContent}>
-          <Text style={[styles.setupTitle, { color: colors.textPrimary }]}>{title}</Text>
-          <Text style={[styles.setupDescription, { color: colors.textSecondary }]}>
-            {description}
-          </Text>
-        </View>
-        <View style={styles.setupStatus}>
-          {completed ? (
-            <CircleCheck size={14} color={colors.success} />
-          ) : (
-            <TriangleAlert size={14} color={colors.warning} />
-          )}
-          <Text
-            style={[
-              styles.setupStatusLabel,
-              { color: completed ? colors.success : colors.warning },
-            ]}
-          >
-            {completed ? 'Completed' : 'Pending'}
-          </Text>
-        </View>
-        <ChevronRight size={18} color={colors.textLight} />
-      </Pressable>
-      {!isLast && <View style={[styles.divider, { backgroundColor: colors.divider }]} />}
-    </View>
-  );
-}
 
 function QuickAction({
   icon,
@@ -148,9 +67,8 @@ export function ShopScreen() {
   const navigation = useNavigation<ShopNav>();
   const mainStack = navigation.getParent<NativeStackNavigationProp<MainStackParamList>>();
   const goToSettings = () => mainStack?.navigate(ROUTES.SETTINGS);
-  const goToShopDetails = () => mainStack?.navigate(ROUTES.SHOP_DETAILS);
   const seller = useAuthStore(state => state.seller);
-  const unreadCount = useUnreadNotificationsCount();
+  const queryClient = useQueryClient();
 
   const isOpen = seller?.shopStatus === 'open';
   const shopName = seller?.shopName ?? 'Your shop';
@@ -165,61 +83,17 @@ export function ShopScreen() {
   // display id from the Mongo _id rather than adding a backend field for it.
   const shopId = seller?._id ? `SHP${seller._id.slice(-6).toUpperCase()}` : '--';
 
-  const setupItems = [
-    {
-      key: 'profile',
-      icon: <Store size={20} color={colors.success} />,
-      tint: colors.success,
-      title: 'Shop Profile',
-      description: 'Name, logo and contact details',
-      completed: Boolean(seller?.shopName && seller?.logo?.url),
-      onPress: goToShopDetails,
-    },
-    {
-      key: 'business',
-      icon: <Building2 size={20} color={colors.fulfillmentProcessing} />,
-      tint: colors.fulfillmentProcessing,
-      title: 'Business Information',
-      description: 'Business details and documents',
-      completed: Boolean(seller?.gstNumber && seller?.businessRegistration),
-      // GST/business registration aren't in PUT /seller/shop's editable
-      // fields (see shop.api.ts) — no dedicated screen for these yet.
-      onPress: goToSettings,
-    },
-    {
-      key: 'shipping',
-      icon: <Truck size={20} color={colors.info} />,
-      tint: colors.info,
-      title: 'Shipping Settings',
-      description: 'Working days and hours',
-      completed: Boolean(
-        seller?.workingHours?.open && seller?.workingHours?.close && seller?.workingDays?.length,
-      ),
-      onPress: goToShopDetails,
-    },
-    {
-      key: 'bank',
-      icon: <Landmark size={20} color={colors.warning} />,
-      tint: colors.warning,
-      title: 'Bank Details',
-      description: 'Add bank account for payouts',
-      completed: Boolean(seller?.bank?.accountNumber),
-      onPress: goToShopDetails,
-    },
-    {
-      // No policies field exists on the seller model yet, so this step
-      // can never resolve to completed until that contract lands.
-      key: 'policies',
-      icon: <ShieldCheck size={20} color={colors.fulfillmentProcessing} />,
-      tint: colors.fulfillmentProcessing,
-      title: 'Shop Policies',
-      description: 'Returns, privacy and terms',
-      completed: false,
-      onPress: goToSettings,
-    },
-  ];
-  const completedCount = setupItems.filter(item => item.completed).length;
+  const notificationsQuery = useQuery({
+    queryKey: ['seller-notifications', 'list'],
+    queryFn: () => getNotifications({ limit: 100 }),
+  });
 
+  const recentNotifications = (notificationsQuery.data?.items ?? []).slice(0, 4);
+
+  const markReadMutation = useMutation({
+    mutationFn: (id: string) => markNotificationRead(id),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['seller-notifications'] }),
+  });
 
   return (
     <Screen>
@@ -232,15 +106,6 @@ export function ShopScreen() {
             </Text>
           </View>
           <View style={styles.headerActions}>
-            <Pressable
-              onPress={() => mainStack?.navigate(ROUTES.NOTIFICATIONS)}
-              style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-            >
-              <Bell size={20} color={colors.textPrimary} />
-              {unreadCount > 0 && (
-                <View style={[styles.bellDot, { backgroundColor: colors.warning }]} />
-              )}
-            </Pressable>
             <Pressable
               onPress={goToSettings}
               style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -308,98 +173,7 @@ export function ShopScreen() {
           </Card>
         </Pressable>
 
-        <Pressable onPress={goToSettings}>
-          <View
-            style={[
-              styles.growCard,
-              { backgroundColor: `${colors.success}14`, borderColor: `${colors.success}30` },
-            ]}
-          >
-            <View style={[styles.growIcon, { backgroundColor: `${colors.success}20` }]}>
-              <TrendingUp size={22} color={colors.success} />
-            </View>
-            <View style={styles.growContent}>
-              <Text style={[styles.growTitle, { color: colors.textPrimary }]}>Grow your shop</Text>
-              <Text style={[styles.growBody, { color: colors.textSecondary }]}>
-                Complete these steps to increase visibility and boost sales.
-              </Text>
-            </View>
-            <View style={styles.growProgress}>
-              <Text style={[styles.growProgressLabel, { color: colors.success }]}>
-                {completedCount}/{setupItems.length} completed
-              </Text>
-              <View style={[styles.progressTrack, { backgroundColor: `${colors.success}20` }]}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      backgroundColor: colors.success,
-                      width: `${(completedCount / setupItems.length) * 100}%`,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-            <ChevronRight size={20} color={colors.textLight} style={styles.growChevron} />
-          </View>
-        </Pressable>
-
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Shop Performance</Text>
-          <Text style={[styles.viewAll, { color: colors.textLink }]}>View all</Text>
-        </View>
-        {/* Views/visitors/followers have no backing endpoint yet (see
-            features/shop/api stub) — zero placeholders like the
-            Dashboard and Products screens use until that contract lands.
-            No shop rating/reviews concept in this app — removed per
-            product decision, not just an unbuilt endpoint. */}
-        <View style={styles.perfGrid}>
-          <PerfTile
-            icon={<Eye size={20} color={colors.fulfillmentProcessing} />}
-            tint={colors.fulfillmentProcessing}
-            value="0"
-            label="Views"
-            caption="-- vs last 7 days"
-          />
-          <PerfTile
-            icon={<Users size={20} color={colors.info} />}
-            tint={colors.info}
-            value="0"
-            label="Visitors"
-            caption="-- vs last 7 days"
-          />
-          <PerfTile
-            icon={<Heart size={20} color={colors.error} />}
-            tint={colors.error}
-            value="0"
-            label="Followers"
-            caption="-- vs last 7 days"
-          />
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Shop Setup</Text>
-          <Pressable onPress={goToShopDetails}>
-            <Text style={[styles.viewAll, { color: colors.textLink }]}>Manage</Text>
-          </Pressable>
-        </View>
-        <Card style={styles.setupCard}>
-          {setupItems.map((item, index) => (
-            <SetupRow
-              key={item.key}
-              icon={item.icon}
-              tint={item.tint}
-              title={item.title}
-              description={item.description}
-              completed={item.completed}
-              isLast={index === setupItems.length - 1}
-              onPress={item.onPress}
-              colors={colors}
-            />
-          ))}
-        </Card>
-
-        <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginTop: Spacing.xl }]}>
+        <Text style={[styles.sectionTitle, { marginTop: Spacing.xl, color: colors.textPrimary }]}>
           Quick Actions
         </Text>
         <View style={styles.quickGrid}>
@@ -432,6 +206,53 @@ export function ShopScreen() {
             colors={colors}
           />
         </View>
+
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notifications</Text>
+          {recentNotifications.length > 0 && (
+            <Pressable onPress={() => mainStack?.navigate(ROUTES.NOTIFICATIONS)}>
+              <Text style={[styles.viewAll, { color: colors.textLink }]}>View all</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {notificationsQuery.isLoading ? (
+          <View style={styles.skeletonList}>
+            {[0, 1, 2].map(i => (
+              <Skeleton
+                key={i}
+                width="100%"
+                height={92}
+                radius={Radius.lg}
+                style={{ marginBottom: Spacing.md }}
+              />
+            ))}
+          </View>
+        ) : recentNotifications.length === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={[styles.emptyIcon, { backgroundColor: colors.accent10 }]}>
+              <Bell size={28} color={colors.accent} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+              No notifications
+            </Text>
+            <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+              You're all caught up — new activity will show up here.
+            </Text>
+          </View>
+        ) : (
+          recentNotifications.map(item => (
+            <NotificationRow
+              key={item._id}
+              item={item}
+              colors={colors}
+              onPress={() => {
+                if (!item.isRead) markReadMutation.mutate(item._id);
+                mainStack?.navigate(ROUTES.NOTIFICATIONS);
+              }}
+            />
+          ))
+        )}
       </ScrollView>
     </Screen>
   );
@@ -471,14 +292,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  bellDot: {
-    position: 'absolute',
-    top: 8,
-    right: 9,
-    width: 7,
-    height: 7,
-    borderRadius: 4,
   },
   shopCard: {
     marginTop: Spacing.lg,
@@ -551,53 +364,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semibold,
   },
-  growCard: {
-    marginTop: Spacing.lg,
-    borderWidth: 1,
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
-  },
-  growIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  growContent: {
-    marginTop: Spacing.md,
-  },
-  growTitle: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-  },
-  growBody: {
-    marginTop: Spacing.xxs,
-    fontSize: FontSize.sm,
-    lineHeight: 19,
-  },
-  growProgress: {
-    marginTop: Spacing.md,
-  },
-  growProgressLabel: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-  },
-  progressTrack: {
-    marginTop: Spacing.sm,
-    height: 6,
-    borderRadius: Radius.full,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: Radius.full,
-  },
-  growChevron: {
-    position: 'absolute',
-    top: Spacing.lg,
-    right: Spacing.lg,
-  },
   sectionHeader: {
     marginTop: Spacing.xl,
     marginBottom: Spacing.md,
@@ -613,78 +379,8 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: FontWeight.medium,
   },
-  perfGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-  },
-  perfTile: {
-    flexBasis: '47%',
-    flexGrow: 1,
-  },
-  perfIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
-  },
-  perfValue: {
-    fontSize: FontSize.xxl,
-    fontWeight: FontWeight.bold,
-  },
-  perfLabel: {
-    fontSize: FontSize.sm,
-    marginTop: Spacing.xxs,
-  },
-  perfCaption: {
-    fontSize: FontSize.xs,
-    marginTop: Spacing.xs,
-  },
-  setupCard: {
-    padding: 0,
-    overflow: 'hidden',
-  },
-  setupRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.lg,
-  },
-  setupIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-  },
-  setupContent: {
-    flex: 1,
-  },
-  setupTitle: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
-  },
-  setupDescription: {
-    marginTop: Spacing.xxs,
-    fontSize: FontSize.xs,
-  },
-  setupStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xxs,
-    marginRight: Spacing.sm,
-  },
-  setupStatusLabel: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.semibold,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    marginLeft: Spacing.lg + 40 + Spacing.md,
-  },
   quickGrid: {
+    marginTop: Spacing.md,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.md,
@@ -708,5 +404,30 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
+  },
+  skeletonList: {
+    marginTop: Spacing.xs,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: Spacing.huge,
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+  },
+  emptyTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+  },
+  emptyBody: {
+    marginTop: Spacing.xs,
+    fontSize: FontSize.sm,
+    textAlign: 'center',
+    maxWidth: 260,
   },
 });

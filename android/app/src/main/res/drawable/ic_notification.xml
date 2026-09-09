@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification-tray icon — Android requires a flat white silhouette here
+     (the full-color launcher icon, mipmap/ic_launcher, gets masked into a
+     white square/blank shape if used directly). A bold "V" mark, matching
+     the app's own wordmark. Wired via AndroidManifest's
+     com.google.firebase.messaging.default_notification_icon meta-data. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M4,4 L7,4 L12,15 L17,4 L20,4 L13,21 L11,21 Z" />
+</vector>

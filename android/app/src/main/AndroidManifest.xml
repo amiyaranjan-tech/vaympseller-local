@@ -1,6 +1,11 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Push notifications (Android 13+ requires the runtime request too —
+         see src/services/notifications/notificationPermissions.ts) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
       android:name=".MainApplication"
@@ -23,5 +28,33 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+
+      <!-- Without these, Firebase falls back to the app's full-color
+           launcher icon, which Android masks into a blank/generic shape
+           in the notification tray (it requires a flat white silhouette,
+           see drawable/ic_notification.xml). -->
+      <meta-data
+          android:name="com.google.firebase.messaging.default_notification_icon"
+          android:resource="@drawable/ic_notification"
+          tools:replace="android:resource" />
+      <meta-data
+          android:name="com.google.firebase.messaging.default_notification_color"
+          android:resource="@color/notification_color"
+          tools:replace="android:resource" />
+
+      <!-- Without this, a background/killed-state push (auto-displayed by
+           the OS straight from the FCM payload, not through Notifee — see
+           localNotifications.ts's own doc comment) lands on whichever
+           default channel Firebase creates on its own, not the 'default'
+           channel this app actually configures a custom sound on (see
+           localNotifications.ts#ensureChannel). Foreground pushes already
+           go through that channel via Notifee regardless.
+           tools:replace avoids the manifest-merger conflict with
+           @react-native-firebase/messaging's own empty-valued entry for
+           this same key. -->
+      <meta-data
+          android:name="com.google.firebase.messaging.default_notification_channel_id"
+          android:value="default"
+          tools:replace="android:value" />
     </application>
 </manifest>

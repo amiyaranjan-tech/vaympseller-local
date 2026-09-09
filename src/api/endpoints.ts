@@ -21,4 +21,8 @@ export const ENDPOINTS = {
   sellerUploads: {
     sign: '/seller/uploads/sign',
   },
+  sellerNotifications: {
+    registerDevice: '/seller/notifications/devices/register',
+    unregisterDevice: '/seller/notifications/devices/unregister',
+  },
 } as const;
