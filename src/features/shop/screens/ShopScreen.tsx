@@ -70,6 +70,8 @@ export function ShopScreen() {
   const mainStack = navigation.getParent<NativeStackNavigationProp<MainStackParamList>>();
   const goToSettings = () => mainStack?.navigate(ROUTES.SETTINGS);
   const seller = useAuthStore(state => state.seller);
+  const role = useAuthStore(state => state.role);
+  const isOwner = role === 'owner';
   const queryClient = useQueryClient();
 
   const isOpen = seller?.shopStatus === 'open';
@@ -88,6 +90,7 @@ export function ShopScreen() {
   const notificationsQuery = useQuery({
     queryKey: ['seller-notifications', 'list'],
     queryFn: () => getNotifications({ limit: 100 }),
+    enabled: isOwner,
   });
   const meQuery = useMe();
 
@@ -192,51 +195,55 @@ export function ShopScreen() {
           </Card>
         </Pressable>
 
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notifications</Text>
-          {recentNotifications.length > 0 && (
-            <Pressable onPress={() => mainStack?.navigate(ROUTES.NOTIFICATIONS)}>
-              <Text style={[styles.viewAll, { color: colors.textLink }]}>View all</Text>
-            </Pressable>
-          )}
-        </View>
-
-        {notificationsQuery.isLoading ? (
-          <View style={styles.skeletonList}>
-            {[0, 1, 2].map(i => (
-              <Skeleton
-                key={i}
-                width="100%"
-                height={92}
-                radius={Radius.lg}
-                style={{ marginBottom: Spacing.md }}
-              />
-            ))}
-          </View>
-        ) : recentNotifications.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.accent10 }]}>
-              <Bell size={28} color={colors.accent} />
+        {isOwner && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notifications</Text>
+              {recentNotifications.length > 0 && (
+                <Pressable onPress={() => mainStack?.navigate(ROUTES.NOTIFICATIONS)}>
+                  <Text style={[styles.viewAll, { color: colors.textLink }]}>View all</Text>
+                </Pressable>
+              )}
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-              No notifications
-            </Text>
-            <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-              You're all caught up — new activity will show up here.
-            </Text>
-          </View>
-        ) : (
-          recentNotifications.map(item => (
-            <NotificationRow
-              key={item._id}
-              item={item}
-              colors={colors}
-              onPress={() => {
-                if (!item.isRead) markReadMutation.mutate(item._id);
-                if (mainStack) navigateFromNotification(item, mainStack);
-              }}
-            />
-          ))
+
+            {notificationsQuery.isLoading ? (
+              <View style={styles.skeletonList}>
+                {[0, 1, 2].map(i => (
+                  <Skeleton
+                    key={i}
+                    width="100%"
+                    height={92}
+                    radius={Radius.lg}
+                    style={{ marginBottom: Spacing.md }}
+                  />
+                ))}
+              </View>
+            ) : recentNotifications.length === 0 ? (
+              <View style={styles.emptyState}>
+                <View style={[styles.emptyIcon, { backgroundColor: colors.accent10 }]}>
+                  <Bell size={28} color={colors.accent} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+                  No notifications
+                </Text>
+                <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+                  You're all caught up — new activity will show up here.
+                </Text>
+              </View>
+            ) : (
+              recentNotifications.map(item => (
+                <NotificationRow
+                  key={item._id}
+                  item={item}
+                  colors={colors}
+                  onPress={() => {
+                    if (!item.isRead) markReadMutation.mutate(item._id);
+                    if (mainStack) navigateFromNotification(item, mainStack);
+                  }}
+                />
+              ))
+            )}
+          </>
         )}
 
         <Text style={[styles.sectionTitle, { marginTop: Spacing.xl, color: colors.textPrimary }]}>
@@ -257,20 +264,24 @@ export function ShopScreen() {
             onPress={() => navigation.navigate(ROUTES.ORDERS)}
             colors={colors}
           />
-          <QuickAction
-            icon={<Percent size={22} color={colors.warning} />}
-            tint={colors.warning}
-            label="Create Offer"
-            onPress={() => mainStack?.navigate(ROUTES.OFFERS)}
-            colors={colors}
-          />
-          <QuickAction
-            icon={<ImageIcon size={22} color={colors.success} />}
-            tint={colors.success}
-            label="Edit Shop Banner"
-            onPress={() => mainStack?.navigate(ROUTES.SHOP_DETAILS, { openBranding: true })}
-            colors={colors}
-          />
+          {isOwner && (
+            <QuickAction
+              icon={<Percent size={22} color={colors.warning} />}
+              tint={colors.warning}
+              label="Create Offer"
+              onPress={() => mainStack?.navigate(ROUTES.OFFERS)}
+              colors={colors}
+            />
+          )}
+          {isOwner && (
+            <QuickAction
+              icon={<ImageIcon size={22} color={colors.success} />}
+              tint={colors.success}
+              label="Edit Shop Banner"
+              onPress={() => mainStack?.navigate(ROUTES.SHOP_DETAILS, { openBranding: true })}
+              colors={colors}
+            />
+          )}
         </View>
       </ScrollView>
     </Screen>

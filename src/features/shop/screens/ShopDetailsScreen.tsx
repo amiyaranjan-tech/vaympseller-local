@@ -176,6 +176,7 @@ export function ShopDetailsScreen() {
   const toast = useToast();
   const seller = useAuthStore(state => state.seller);
   const updateSeller = useAuthStore(state => state.updateSeller);
+  const isOwner = useAuthStore(state => state.role) === 'owner';
 
   const [shopName, setShopName] = useState(seller?.shopName ?? '');
   const [ownerName, setOwnerName] = useState(seller?.ownerName ?? '');
@@ -428,13 +429,20 @@ export function ShopDetailsScreen() {
         </Card>
 
         <View style={styles.footer}>
-          <Button label="Cancel" variant="outline" onPress={() => navigation.goBack()} style={styles.footerButton} />
           <Button
-            label={wasRejected ? 'Save & Resubmit' : 'Save Changes'}
-            onPress={() => saveMutation.mutate()}
-            loading={saveMutation.isPending}
+            label={isOwner ? 'Cancel' : 'Back'}
+            variant="outline"
+            onPress={() => navigation.goBack()}
             style={styles.footerButton}
           />
+          {isOwner && (
+            <Button
+              label={wasRejected ? 'Save & Resubmit' : 'Save Changes'}
+              onPress={() => saveMutation.mutate()}
+              loading={saveMutation.isPending}
+              style={styles.footerButton}
+            />
+          )}
         </View>
       </ScrollView>
 

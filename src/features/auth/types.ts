@@ -1,5 +1,10 @@
 import type { SellerProfile } from '../../types/seller';
 
+// "owner" is the full-access account (models/Seller.js). "helper" is an
+// owner-created staff login (models/SellerStaff.js) scoped to the same
+// shop — see useAuthStore's role field for what it can't see.
+export type SellerRole = 'owner' | 'helper';
+
 export interface AuthResponse {
   seller: SellerProfile;
   token: string;
@@ -7,6 +12,14 @@ export interface AuthResponse {
 
 export interface LoginResponse extends AuthResponse {
   blockedReason: string | null;
+  role: SellerRole;
+  staffName: string | null;
+}
+
+export interface MeResponse {
+  seller: SellerProfile;
+  role: SellerRole;
+  staffName: string | null;
 }
 
 export interface RegisterPayload {

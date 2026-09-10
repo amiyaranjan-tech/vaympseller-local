@@ -14,11 +14,13 @@ import { ShopDetailsScreen } from '../features/shop/screens/ShopDetailsScreen';
 import { OrdersScreen } from '../features/orders/screens/OrdersScreen';
 import { OrderActivityScreen } from '../features/orders/screens/OrderActivityScreen';
 import { OrderDetailScreen } from '../features/orders/screens/OrderDetailScreen';
+import { ManageHelpersScreen } from '../features/staff/screens/ManageHelpersScreen';
 import { FinanceScreen } from '../features/finance/screens/FinanceScreen';
 import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
 import { useUnreadNewOrdersCount } from '../features/notifications/useUnreadNewOrdersCount';
 import { ComingSoonScreen } from '../components/common/ComingSoonScreen';
 import { useThemeColors } from '../store/themeStore';
+import { useAuthStore } from '../store/useAuthStore';
 import {
   ROUTES,
   type MainStackParamList,
@@ -37,7 +39,11 @@ const Stack = createNativeStackNavigator<MainStackParamList>();
 
 function MainTabs() {
   const { colors } = useThemeColors();
-  const unreadNewOrders = useUnreadNewOrdersCount();
+  const role = useAuthStore(state => state.role);
+  // Notifications are owner-only server-side too (see requireOwner on
+  // sellerNotifications.routes.js) — a helper's request would just 403, so
+  // skip it rather than showing a badge that can never load.
+  const unreadNewOrders = useUnreadNewOrdersCount(role === 'owner');
 
   return (
     <Tab.Navigator
@@ -68,11 +74,13 @@ function MainTabs() {
           tabBarBadgeStyle: { backgroundColor: colors.error },
         }}
       />
-      <Tab.Screen
-        name={ROUTES.FINANCE}
-        component={FinanceScreen}
-        options={{ tabBarIcon: ({ color, size }) => <Wallet color={color} size={size} /> }}
-      />
+      {role === 'owner' && (
+        <Tab.Screen
+          name={ROUTES.FINANCE}
+          component={FinanceScreen}
+          options={{ tabBarIcon: ({ color, size }) => <Wallet color={color} size={size} /> }}
+        />
+      )}
       <Tab.Screen
         name={ROUTES.SHOP}
         component={ShopScreen}
@@ -103,6 +111,7 @@ export function MainNavigator() {
       <Stack.Screen name={ROUTES.SHOP_DETAILS} component={ShopDetailsScreen} />
       <Stack.Screen name={ROUTES.ORDER_ACTIVITY} component={OrderActivityScreen} />
       <Stack.Screen name={ROUTES.ORDER_DETAIL} component={OrderDetailScreen} />
+      <Stack.Screen name={ROUTES.MANAGE_HELPERS} component={ManageHelpersScreen} />
     </Stack.Navigator>
   );
 }

@@ -11,11 +11,12 @@ import { getNotifications } from './notifications.api';
 // order just came in" should update quickly once
 // notificationService.ts's foreground-push handler invalidates this
 // query key.
-export function useUnreadNewOrdersCount() {
+export function useUnreadNewOrdersCount(enabled = true) {
   const query = useQuery({
     queryKey: ['seller-notifications', 'unread-new-orders'],
     queryFn: () => getNotifications({ isRead: false, limit: 100 }),
     staleTime: 5000,
+    enabled,
   });
 
   return (query.data?.items ?? []).filter(n => n.type === 'new_order').length;

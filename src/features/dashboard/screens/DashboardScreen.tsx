@@ -83,7 +83,9 @@ export function DashboardScreen() {
   const queryClient = useQueryClient();
   const seller = useAuthStore(state => state.seller);
   const updateSeller = useAuthStore(state => state.updateSeller);
-  const unreadCount = useUnreadNotificationsCount();
+  const role = useAuthStore(state => state.role);
+  const isOwner = role === 'owner';
+  const unreadCount = useUnreadNotificationsCount(isOwner);
   const meQuery = useMe();
 
   const [period, setPeriod] = useState<Period>('This Month');
@@ -172,19 +174,21 @@ export function DashboardScreen() {
               />
             </View>
 
-            <Pressable
-              onPress={() =>
-                navigation
-                  .getParent<NativeStackNavigationProp<MainStackParamList>>()
-                  ?.navigate(ROUTES.NOTIFICATIONS)
-              }
-              style={[styles.bellButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-            >
-              <Bell size={20} color={colors.textPrimary} />
-              {unreadCount > 0 && (
-                <View style={[styles.bellDot, { backgroundColor: colors.warning }]} />
-              )}
-            </Pressable>
+            {isOwner && (
+              <Pressable
+                onPress={() =>
+                  navigation
+                    .getParent<NativeStackNavigationProp<MainStackParamList>>()
+                    ?.navigate(ROUTES.NOTIFICATIONS)
+                }
+                style={[styles.bellButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+              >
+                <Bell size={20} color={colors.textPrimary} />
+                {unreadCount > 0 && (
+                  <View style={[styles.bellDot, { backgroundColor: colors.warning }]} />
+                )}
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -208,14 +212,16 @@ export function DashboardScreen() {
         </View>
 
         <View style={styles.grid}>
-          <StatTile
-            icon={<IndianRupee size={20} color={colors.success} />}
-            tint={colors.success}
-            value={seller?.revenue ?? 0}
-            label="Revenue"
-            caption={`-- vs ${period.toLowerCase()}`}
-            captionColor={colors.textSecondary}
-          />
+          {isOwner && (
+            <StatTile
+              icon={<IndianRupee size={20} color={colors.success} />}
+              tint={colors.success}
+              value={seller?.revenue ?? 0}
+              label="Revenue"
+              caption={`-- vs ${period.toLowerCase()}`}
+              captionColor={colors.textSecondary}
+            />
+          )}
           <StatTile
             icon={<ShoppingBag size={20} color={colors.info} />}
             tint={colors.info}

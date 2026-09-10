@@ -19,7 +19,7 @@ export function useMe() {
 
   useEffect(() => {
     if (query.data) {
-      updateSeller(query.data.seller);
+      updateSeller(query.data.seller, query.data.role, query.data.staffName);
     }
   }, [query.data, updateSeller]);
 

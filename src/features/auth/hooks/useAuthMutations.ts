@@ -19,7 +19,7 @@ export function useLogin() {
     mutationFn: (payload: LoginPayload) => authApi.login(payload),
     onSuccess: async result => {
       await setToken(result.token);
-      setSession(result.seller);
+      setSession(result.seller, result.role, result.staffName);
     },
   });
 }

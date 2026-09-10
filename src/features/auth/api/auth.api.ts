@@ -1,12 +1,12 @@
 import { request } from '../../../api/client';
 import { ENDPOINTS } from '../../../api/endpoints';
-import type { SellerProfile } from '../../../types/seller';
 import type {
   AuthResponse,
   ChangePasswordPayload,
   ForgotPasswordPayload,
   LoginPayload,
   LoginResponse,
+  MeResponse,
   RegisterPayload,
   ResetPasswordPayload,
 } from '../types';
@@ -26,7 +26,7 @@ export const login = (payload: LoginPayload) =>
   });
 
 export const getMe = () =>
-  request<{ seller: SellerProfile }>({
+  request<MeResponse>({
     url: ENDPOINTS.sellerAuth.me,
     method: 'GET',
   });

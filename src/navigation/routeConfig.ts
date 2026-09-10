@@ -27,6 +27,7 @@ export const ROUTES = {
   SHOP_DETAILS: 'ShopDetails',
   ORDER_ACTIVITY: 'OrderActivity',
   ORDER_DETAIL: 'OrderDetail',
+  MANAGE_HELPERS: 'ManageHelpers',
 
   // Bottom tabs
   DASHBOARD: 'Dashboard',
@@ -67,6 +68,7 @@ export type MainStackParamList = {
   ShopDetails: { openBranding?: boolean } | undefined;
   OrderActivity: undefined;
   OrderDetail: { orderId: string };
+  ManageHelpers: undefined;
 };
 
 // Root switch: unauthenticated -> Auth, authenticated but blocked (pending/

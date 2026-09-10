@@ -16,6 +16,7 @@ import {
   Smartphone,
   Trash2,
   User,
+  Users,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -24,6 +25,7 @@ import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
 import { useThemeColors } from '../../../store/themeStore';
 import { useThemeStore, type ThemeMode } from '../../../store/themeStore';
+import { useAuthStore } from '../../../store/useAuthStore';
 import { useLogout } from '../../auth/hooks/useAuthMutations';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
@@ -93,6 +95,7 @@ export function SettingsScreen() {
   const navigation = useNavigation<SettingsNav>();
   const mode = useThemeStore(state => state.mode);
   const setMode = useThemeStore(state => state.setMode);
+  const isOwner = useAuthStore(state => state.role) === 'owner';
   const logout = useLogout();
 
   // No /seller/notification-preferences endpoint yet — these toggles are
@@ -141,15 +144,17 @@ export function SettingsScreen() {
 
         <SectionLabel label="NOTIFICATIONS" colors={colors} />
         <Card style={styles.card}>
-          <SettingsRow
-            icon={<Bell size={20} color={colors.info} />}
-            tint={colors.info}
-            title="Notifications"
-            description="Manage all notification preferences"
-            isLast={false}
-            onPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)}
-            colors={colors}
-          />
+          {isOwner && (
+            <SettingsRow
+              icon={<Bell size={20} color={colors.info} />}
+              tint={colors.info}
+              title="Notifications"
+              description="Manage all notification preferences"
+              isLast={false}
+              onPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)}
+              colors={colors}
+            />
+          )}
           <SettingsRow
             icon={<ShoppingBag size={20} color={colors.success} />}
             tint={colors.success}
@@ -220,6 +225,23 @@ export function SettingsScreen() {
             colors={colors}
           />
         </Card>
+
+        {isOwner && (
+          <>
+            <SectionLabel label="TEAM" colors={colors} />
+            <Card style={styles.card}>
+              <SettingsRow
+                icon={<Users size={20} color={colors.accent} />}
+                tint={colors.accent}
+                title="Manage Helpers"
+                description="Add or remove helper accounts for your shop"
+                isLast
+                onPress={() => navigation.navigate(ROUTES.MANAGE_HELPERS)}
+                colors={colors}
+              />
+            </Card>
+          </>
+        )}
 
         <SectionLabel label="SUPPORT" colors={colors} />
         <Card style={styles.card}>
