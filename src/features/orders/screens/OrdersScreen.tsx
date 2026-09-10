@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  Bell,
   CircleCheck,
   CircleX,
   ClipboardList,
@@ -15,7 +15,6 @@ import {
   PackageCheck,
   Search,
   ShoppingBag,
-  ShoppingCart,
   Sparkle,
   SlidersHorizontal,
   TrendingUp,
@@ -26,17 +25,17 @@ import {
 import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
+import { Badge, type BadgeTone } from '../../../components/common/Badge';
 import { BottomSheet } from '../../../components/common/BottomSheet';
+import { Skeleton } from '../../../components/feedback/Skeleton';
 import { useThemeColors } from '../../../store/themeStore';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import { ROUTES, type MainStackParamList, type MainTabParamList } from '../../../navigation/routeConfig';
+import { getOrders, type Order, type OrderFulfillmentStatus } from '../orders.api';
 
 type Colors = ReturnType<typeof useThemeColors>['colors'];
 
-// No /seller/orders endpoint exists yet (see MainNavigator.tsx's own
-// comment on this) — every count/list here is a zero placeholder, same
-// convention as Dashboard/Products/Shop until that contract lands.
 const STAT_DEFS = [
   { key: 'total', label: 'Total', icon: ShoppingBag, tint: (c: Colors) => c.info },
   { key: 'pending', label: 'Pending', icon: Clock3, tint: (c: Colors) => c.warning },
@@ -46,29 +45,49 @@ const STAT_DEFS = [
   { key: 'cancelled', label: 'Cancelled', icon: CircleX, tint: (c: Colors) => c.error },
 ] as const;
 
-const ACTIVITY_ROWS = [
-  {
-    key: 'new-orders',
-    icon: ShoppingCart,
-    tint: (c: Colors) => c.success,
-    title: 'No new orders',
-    description: "You're all caught up!",
-  },
-  {
-    key: 'update-status',
-    icon: Truck,
-    tint: (c: Colors) => c.warning,
-    title: 'Update order status',
-    description: 'Keep customers informed about their orders.',
-  },
-  {
-    key: 'enable-notifications',
-    icon: Bell,
-    tint: (c: Colors) => c.fulfillmentProcessing,
-    title: 'Enable notifications',
-    description: 'Get notified for new orders and updates.',
-  },
-] as const;
+// Folds the real 8-value sellerStatus enum down into STAT_DEFS' 6 tiles —
+// Confirmed/Processing share the "processing" tile, Packed/Shipped/Out for
+// Delivery share "shipped", matching what a seller actually cares to count
+// at a glance rather than redesigning the tile row for every intermediate
+// state.
+function statBucket(status: OrderFulfillmentStatus): (typeof STAT_DEFS)[number]['key'] {
+  switch (status) {
+    case 'Pending':
+      return 'pending';
+    case 'Confirmed':
+    case 'Processing':
+      return 'processing';
+    case 'Packed':
+    case 'Shipped':
+    case 'Out for Delivery':
+      return 'shipped';
+    case 'Delivered':
+      return 'delivered';
+    case 'Cancelled':
+      return 'cancelled';
+  }
+}
+
+const STATUS_TONE: Record<OrderFulfillmentStatus, BadgeTone> = {
+  Pending: 'warning',
+  Confirmed: 'info',
+  Processing: 'info',
+  Packed: 'info',
+  Shipped: 'success',
+  'Out for Delivery': 'success',
+  Delivered: 'success',
+  Cancelled: 'error',
+};
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
 const HAPPY_CUSTOMER_TIPS = [
   {
@@ -123,6 +142,30 @@ export function OrdersScreen() {
   const mainStack = navigation.getParent<NativeStackNavigationProp<MainStackParamList>>();
   const [tipsSheetOpen, setTipsSheetOpen] = useState(false);
 
+  const ordersQuery = useQuery({
+    queryKey: ['seller-orders', 'list'],
+    queryFn: () => getOrders({ limit: 100 }),
+  });
+
+  const orders = ordersQuery.data?.items ?? [];
+
+  const counts: Record<(typeof STAT_DEFS)[number]['key'], number> = {
+    total: orders.length,
+    pending: 0,
+    processing: 0,
+    shipped: 0,
+    delivered: 0,
+    cancelled: 0,
+  };
+  orders.forEach(order => {
+    counts[statBucket(order.fulfillment.sellerStatus)] += 1;
+  });
+
+  const recentOrders = orders.slice(0, 3);
+
+  const goToOrder = (orderId: string) =>
+    mainStack?.navigate(ROUTES.ORDER_DETAIL, { orderId });
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
@@ -155,7 +198,7 @@ export function OrdersScreen() {
                   <Icon size={18} color={tint} />
                 </View>
                 <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{def.label}</Text>
-                <Text style={[styles.statValue, { color: colors.textPrimary }]}>0</Text>
+                <Text style={[styles.statValue, { color: colors.textPrimary }]}>{counts[def.key]}</Text>
                 <View style={[styles.statUnderline, { backgroundColor: tint }]} />
               </View>
             );
@@ -195,64 +238,97 @@ export function OrdersScreen() {
           </Pressable>
         </View>
 
-        <Card style={styles.emptyCard}>
-          <View style={[styles.emptyIconRing, { backgroundColor: `${colors.accent}14` }]}>
-            <ClipboardList size={48} color={colors.accent} />
-            <View style={[styles.emptySearchBadge, { backgroundColor: colors.accent }]}>
-              <Search size={16} color={colors.textInverse} />
+        {ordersQuery.isLoading ? (
+          <>
+            <Skeleton height={72} style={styles.skeletonBlock} />
+            <Skeleton height={72} style={styles.skeletonBlock} />
+            <Skeleton height={72} style={styles.skeletonBlock} />
+          </>
+        ) : orders.length === 0 ? (
+          <Card style={styles.emptyCard}>
+            <View style={[styles.emptyIconRing, { backgroundColor: `${colors.accent}14` }]}>
+              <ClipboardList size={48} color={colors.accent} />
+              <View style={[styles.emptySearchBadge, { backgroundColor: colors.accent }]}>
+                <Search size={16} color={colors.textInverse} />
+              </View>
+              <Sparkle size={14} color={colors.accent} style={[styles.sparkle, { top: 4, left: 4 }]} />
+              <Sparkle size={12} color={colors.warning} style={[styles.sparkle, { top: 20, right: -4 }]} />
+              <Sparkle size={10} color={colors.accent} style={[styles.sparkle, { bottom: 10, left: -10 }]} />
             </View>
-            <Sparkle size={14} color={colors.accent} style={[styles.sparkle, { top: 4, left: 4 }]} />
-            <Sparkle size={12} color={colors.warning} style={[styles.sparkle, { top: 20, right: -4 }]} />
-            <Sparkle size={10} color={colors.accent} style={[styles.sparkle, { bottom: 10, left: -10 }]} />
-          </View>
 
-          <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No orders yet</Text>
-          <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-            When customers place orders, they will appear here.
-          </Text>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No orders yet</Text>
+            <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+              When customers place orders, they will appear here.
+            </Text>
 
-          <Button
-            label="Go to Products"
-            onPress={() => navigation.navigate(ROUTES.PRODUCTS)}
-            leftIcon={<ShoppingBag size={18} color={colors.buttonPrimaryText} />}
-            style={styles.emptyButton}
-          />
-        </Card>
-
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Recent activity</Text>
-          <Pressable onPress={() => mainStack?.navigate(ROUTES.ORDER_ACTIVITY)}>
-            <Text style={[styles.viewAll, { color: colors.textLink }]}>View all</Text>
-          </Pressable>
-        </View>
-
-        <Pressable onPress={() => mainStack?.navigate(ROUTES.ORDER_ACTIVITY)}>
-        <Card style={styles.activityCard}>
-          {ACTIVITY_ROWS.map((row, index) => {
-            const Icon = row.icon;
-            const tint = row.tint(colors);
-            return (
-              <View key={row.key}>
-                <View style={styles.activityRow}>
-                  <View style={[styles.activityIcon, { backgroundColor: `${tint}20` }]}>
-                    <Icon size={20} color={tint} />
-                  </View>
-                  <View style={styles.activityContent}>
-                    <Text style={[styles.activityTitle, { color: colors.textPrimary }]}>{row.title}</Text>
-                    <Text style={[styles.activityDescription, { color: colors.textSecondary }]}>
-                      {row.description}
+            <Button
+              label="Go to Products"
+              onPress={() => navigation.navigate(ROUTES.PRODUCTS)}
+              leftIcon={<ShoppingBag size={18} color={colors.buttonPrimaryText} />}
+              style={styles.emptyButton}
+            />
+          </Card>
+        ) : (
+          <Card style={styles.activityCard}>
+            {orders.map((order: Order, index) => (
+              <View key={order._id}>
+                <Pressable style={styles.orderRow} onPress={() => goToOrder(order._id)}>
+                  <View style={styles.orderRowInfo}>
+                    <Text style={[styles.orderRowTitle, { color: colors.textPrimary }]}>
+                      #{order.orderNumber}
+                    </Text>
+                    <Text style={[styles.orderRowMeta, { color: colors.textSecondary }]}>
+                      {order.customer.name} · ₹{order.total.toFixed(0)}
                     </Text>
                   </View>
+                  <Badge
+                    label={order.fulfillment.sellerStatus}
+                    tone={STATUS_TONE[order.fulfillment.sellerStatus]}
+                  />
                   <ChevronRight size={20} color={colors.textLight} />
-                </View>
-                {index < ACTIVITY_ROWS.length - 1 && (
+                </Pressable>
+                {index < orders.length - 1 && (
                   <View style={[styles.divider, { backgroundColor: colors.divider }]} />
                 )}
               </View>
-            );
-          })}
-        </Card>
-        </Pressable>
+            ))}
+          </Card>
+        )}
+
+        {recentOrders.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Recent activity</Text>
+              <Pressable onPress={() => mainStack?.navigate(ROUTES.ORDER_ACTIVITY)}>
+                <Text style={[styles.viewAll, { color: colors.textLink }]}>View all</Text>
+              </Pressable>
+            </View>
+
+            <Card style={styles.activityCard}>
+              {recentOrders.map((order, index) => (
+                <View key={order._id}>
+                  <Pressable style={styles.activityRow} onPress={() => goToOrder(order._id)}>
+                    <View style={[styles.activityIcon, { backgroundColor: `${colors.info}20` }]}>
+                      <Package size={20} color={colors.info} />
+                    </View>
+                    <View style={styles.activityContent}>
+                      <Text style={[styles.activityTitle, { color: colors.textPrimary }]}>
+                        Order #{order.orderNumber} — {order.fulfillment.sellerStatus}
+                      </Text>
+                      <Text style={[styles.activityDescription, { color: colors.textSecondary }]}>
+                        {timeAgo(order.createdAt)}
+                      </Text>
+                    </View>
+                    <ChevronRight size={20} color={colors.textLight} />
+                  </Pressable>
+                  {index < recentOrders.length - 1 && (
+                    <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+                  )}
+                </View>
+              ))}
+            </Card>
+          </>
+        )}
       </ScrollView>
 
       <BottomSheet visible={tipsSheetOpen} onClose={() => setTipsSheetOpen(false)}>
@@ -488,6 +564,26 @@ const styles = StyleSheet.create({
   emptyButton: {
     marginTop: Spacing.xl,
     minWidth: 200,
+  },
+  skeletonBlock: {
+    marginTop: Spacing.lg,
+  },
+  orderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.lg,
+  },
+  orderRowInfo: {
+    flex: 1,
+  },
+  orderRowTitle: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
+  },
+  orderRowMeta: {
+    marginTop: 2,
+    fontSize: FontSize.xs,
   },
   sectionHeader: {
     marginTop: Spacing.xl,

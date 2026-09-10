@@ -14,12 +14,13 @@ import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
  * instead of an in-app toast, using the same icon/color already set up in
  * AndroidManifest.xml for the background case.
  *
- * Dropped vs. the Consumer app: per-type deep-link routing — seller
- * lifecycle notifications (verified/suspended/registered/...) carry no
- * entity data to route on (see sellerNotification.service.js's
- * sendSellerPush, which sends an empty `data`), so a tap just surfaces the
- * Shop tab's own notifications list (see notificationService.ts's
- * handleMessageTap) rather than navigating to a specific entity.
+ * Most seller lifecycle notifications (verified/suspended/registered/...)
+ * still carry no entity data to route on (sendSellerPush's `data` defaults
+ * to `{}`), so most taps still just surface the Shop tab's own
+ * notifications list. new_order is the one type that now does carry data
+ * (`{orderId}` — see sellerNotification.service.js#notifyNewOrder) — data
+ * is threaded through here (Notifee's own `data` field) so
+ * notificationService.ts#handleMessageTap can deep-link that one case.
  */
 
 const CHANNEL_ID = 'default';
@@ -55,9 +56,11 @@ function ensureChannel(): Promise<void> {
 export async function displayForegroundNotification({
   title,
   body,
+  data,
 }: {
   title: string;
   body?: string;
+  data?: Record<string, string>;
 }) {
   try {
     await ensureChannel();
@@ -65,6 +68,7 @@ export async function displayForegroundNotification({
     await notifee.displayNotification({
       title,
       body,
+      data,
       android: {
         channelId: CHANNEL_ID,
         smallIcon: 'ic_notification',
@@ -82,10 +86,12 @@ export async function displayForegroundNotification({
 }
 
 /** Tapping a locally-displayed (foreground) notification. */
-export function initLocalNotificationTapHandling(onTap: () => void) {
+export function initLocalNotificationTapHandling(
+  onTap: (data?: Record<string, string>) => void,
+) {
   try {
-    notifee.onForegroundEvent(({ type }) => {
-      if (type === EventType.PRESS) onTap();
+    notifee.onForegroundEvent(({ type, detail }) => {
+      if (type === EventType.PRESS) onTap(detail.notification?.data as Record<string, string> | undefined);
     });
   } catch (error) {
     console.log('[localNotifications] onForegroundEvent wiring failed', error);

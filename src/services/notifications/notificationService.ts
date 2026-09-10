@@ -27,10 +27,13 @@ import {
  * app's zustand + axios-interceptor auth (no authToken threading needed
  * here — src/api/client.ts's request() already attaches it to every call,
  * unlike Consumer's Redux-held token). Device-token registration, the
- * foreground push-display wiring, and tap handling; there's no per-type
- * deep link to resolve (seller lifecycle pushes carry no entity data — see
- * sendSellerPush's empty `data`), so every tap just opens the notifications
- * inbox screen rather than navigating to a specific entity.
+ * foreground push-display wiring, and tap handling. Most seller lifecycle
+ * pushes still carry no entity data (sendSellerPush's `data` defaults to
+ * `{}`), so most taps still just open the notifications inbox — but a
+ * `new_order` push DOES carry `{orderId}` (see sellerNotification.service.js
+ * #notifyNewOrder), so that one case deep-links straight to OrderDetail
+ * instead, same shape the Consumer app's notificationNavigation.ts already
+ * reads for its own OrderDetails deep link.
  */
 
 // Firebase is only set up for Android right now (no iOS app registered in
@@ -71,21 +74,35 @@ export async function unregisterCurrentDevice() {
 // Cold-start tap resolves before NavigationContainer necessarily has —
 // isReady() would otherwise silently drop it. Polls briefly rather than
 // giving up.
-function goToNotificationsOnceReady(attemptsLeft = 30) {
+function navigateOnceReady(navigate: () => void, attemptsLeft = 30) {
   if (navigationRef.isReady()) {
-    navigationRef.navigate(ROUTES.MAIN, {
-      screen: ROUTES.NOTIFICATIONS,
-    });
+    navigate();
     return;
   }
 
   if (attemptsLeft <= 0) return;
-  setTimeout(() => goToNotificationsOnceReady(attemptsLeft - 1), 100);
+  setTimeout(() => navigateOnceReady(navigate, attemptsLeft - 1), 100);
 }
 
-function handleMessageTap() {
+function handleMessageTap(data?: Record<string, string>) {
   void queryClient.invalidateQueries({ queryKey: ['seller-notifications'] });
-  goToNotificationsOnceReady();
+  void queryClient.invalidateQueries({ queryKey: ['seller-orders'] });
+
+  if (data?.orderId) {
+    navigateOnceReady(() =>
+      navigationRef.navigate(ROUTES.MAIN, {
+        screen: ROUTES.ORDER_DETAIL,
+        params: { orderId: data.orderId },
+      }),
+    );
+    return;
+  }
+
+  navigateOnceReady(() =>
+    navigationRef.navigate(ROUTES.MAIN, {
+      screen: ROUTES.NOTIFICATIONS,
+    }),
+  );
 }
 
 let started = false;
@@ -140,14 +157,15 @@ export function initNotifications() {
     void displayForegroundNotification({
       title: notification.title ?? 'New notification',
       body: notification.body,
+      data: message.data as Record<string, string> | undefined,
     });
   });
 
-  initLocalNotificationTapHandling(handleMessageTap);
+  initLocalNotificationTapHandling(data => handleMessageTap(data));
 
-  onNotificationOpenedApp(handleMessageTap);
+  onNotificationOpenedApp(message => handleMessageTap(message.data as Record<string, string> | undefined));
 
   void getInitialNotification().then(message => {
-    if (message) handleMessageTap();
+    if (message) handleMessageTap(message.data as Record<string, string> | undefined);
   });
 }

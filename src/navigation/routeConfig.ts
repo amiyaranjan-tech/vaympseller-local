@@ -26,6 +26,7 @@ export const ROUTES = {
   PRODUCT_DETAILS: 'ProductDetails',
   SHOP_DETAILS: 'ShopDetails',
   ORDER_ACTIVITY: 'OrderActivity',
+  ORDER_DETAIL: 'OrderDetail',
 
   // Bottom tabs
   DASHBOARD: 'Dashboard',
@@ -65,6 +66,7 @@ export type MainStackParamList = {
   ProductDetails: { productId: string; tab?: 'details' | 'deals' };
   ShopDetails: { openBranding?: boolean } | undefined;
   OrderActivity: undefined;
+  OrderDetail: { orderId: string };
 };
 
 // Root switch: unauthenticated -> Auth, authenticated but blocked (pending/

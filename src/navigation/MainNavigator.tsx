@@ -13,6 +13,7 @@ import { ProductDetailsScreen } from '../features/products/screens/ProductDetail
 import { ShopDetailsScreen } from '../features/shop/screens/ShopDetailsScreen';
 import { OrdersScreen } from '../features/orders/screens/OrdersScreen';
 import { OrderActivityScreen } from '../features/orders/screens/OrderActivityScreen';
+import { OrderDetailScreen } from '../features/orders/screens/OrderDetailScreen';
 import { FinanceScreen } from '../features/finance/screens/FinanceScreen';
 import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
 import { ComingSoonScreen } from '../components/common/ComingSoonScreen';
@@ -95,6 +96,7 @@ export function MainNavigator() {
       <Stack.Screen name={ROUTES.PRODUCT_DETAILS} component={ProductDetailsScreen} />
       <Stack.Screen name={ROUTES.SHOP_DETAILS} component={ShopDetailsScreen} />
       <Stack.Screen name={ROUTES.ORDER_ACTIVITY} component={OrderActivityScreen} />
+      <Stack.Screen name={ROUTES.ORDER_DETAIL} component={OrderDetailScreen} />
     </Stack.Navigator>
   );
 }
