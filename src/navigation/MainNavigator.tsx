@@ -16,6 +16,7 @@ import { OrderActivityScreen } from '../features/orders/screens/OrderActivityScr
 import { OrderDetailScreen } from '../features/orders/screens/OrderDetailScreen';
 import { FinanceScreen } from '../features/finance/screens/FinanceScreen';
 import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
+import { useUnreadNewOrdersCount } from '../features/notifications/useUnreadNewOrdersCount';
 import { ComingSoonScreen } from '../components/common/ComingSoonScreen';
 import { useThemeColors } from '../store/themeStore';
 import {
@@ -36,6 +37,7 @@ const Stack = createNativeStackNavigator<MainStackParamList>();
 
 function MainTabs() {
   const { colors } = useThemeColors();
+  const unreadNewOrders = useUnreadNewOrdersCount();
 
   return (
     <Tab.Navigator
@@ -60,7 +62,11 @@ function MainTabs() {
       <Tab.Screen
         name={ROUTES.ORDERS}
         component={OrdersScreen}
-        options={{ tabBarIcon: ({ color, size }) => <ShoppingBag color={color} size={size} /> }}
+        options={{
+          tabBarIcon: ({ color, size }) => <ShoppingBag color={color} size={size} />,
+          tabBarBadge: unreadNewOrders > 0 ? unreadNewOrders : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.error },
+        }}
       />
       <Tab.Screen
         name={ROUTES.FINANCE}

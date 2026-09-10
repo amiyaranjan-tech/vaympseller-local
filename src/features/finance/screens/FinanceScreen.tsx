@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   ChevronDown,
   ChevronRight,
@@ -18,9 +18,11 @@ import {
 import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
+import { BottomSheet } from '../../../components/common/BottomSheet';
 import { useThemeColors } from '../../../store/themeStore';
 import { useToast } from '../../../components/feedback/Toast';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { useMe } from '../../auth/hooks/useMe';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 
@@ -46,15 +48,38 @@ const DEDUCTION_ROWS = [
   { key: 'adjustments', label: 'Adjustments', dot: (c: Colors) => c.fulfillmentProcessing, negative: false },
 ] as const;
 
+const HELP_TOPICS = [
+  { title: 'Available Balance', body: 'Money you can withdraw right now — settled sales minus any deductions.' },
+  { title: 'Pending Payout', body: 'Earnings from recent orders that haven’t finished their settlement window yet.' },
+  { title: 'Total Payouts', body: 'Everything already paid out to your bank account to date.' },
+  { title: 'Commission Rate', body: 'The percentage Vaymp keeps from each sale — set by the platform, shown here for reference.' },
+  { title: 'Product Sales', body: 'Gross revenue from items sold, before any deductions.' },
+  { title: 'Shipping Charges', body: 'Delivery fees collected from customers on your orders.' },
+  { title: 'Returns & Refunds', body: 'Amounts deducted for orders that were returned or refunded.' },
+  { title: 'Net Earnings', body: 'What you actually take home — sales plus other income, minus deductions.' },
+] as const;
+
 export function FinanceScreen() {
   const { colors } = useThemeColors();
   const toast = useToast();
   const seller = useAuthStore(state => state.seller);
   const commissionRate = seller?.commissionRate ?? 0;
+  const meQuery = useMe();
+  const [helpOpen, setHelpOpen] = useState(false);
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={meQuery.isRefetching}
+            onRefresh={() => void meQuery.refetch()}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+      >
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={[styles.title, { color: colors.textPrimary }]}>Finance</Text>
@@ -67,7 +92,10 @@ export function FinanceScreen() {
               <Download size={16} color={colors.textPrimary} />
               <Text style={[styles.pillButtonLabel, { color: colors.textPrimary }]}>Statement</Text>
             </Pressable>
-            <Pressable style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Pressable
+              onPress={() => setHelpOpen(true)}
+              style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
               <CircleHelp size={18} color={colors.textPrimary} />
             </Pressable>
           </View>
@@ -215,6 +243,21 @@ export function FinanceScreen() {
           </Text>
         </Card>
       </ScrollView>
+
+      <BottomSheet visible={helpOpen} onClose={() => setHelpOpen(false)}>
+        <ScrollView showsVerticalScrollIndicator={false} style={styles.helpSheetScroll}>
+          <Text style={[styles.helpSheetTitle, { color: colors.textPrimary }]}>
+            Understanding your Finance page
+          </Text>
+          {HELP_TOPICS.map(topic => (
+            <View key={topic.title} style={styles.helpTopic}>
+              <Text style={[styles.helpTopicTitle, { color: colors.textPrimary }]}>{topic.title}</Text>
+              <Text style={[styles.helpTopicBody, { color: colors.textSecondary }]}>{topic.body}</Text>
+            </View>
+          ))}
+          <Button label="Got it" onPress={() => setHelpOpen(false)} style={styles.helpSheetButton} />
+        </ScrollView>
+      </BottomSheet>
     </Screen>
   );
 }
@@ -439,5 +482,29 @@ const styles = StyleSheet.create({
   emptyButton: {
     marginTop: Spacing.lg,
     minWidth: 200,
+  },
+  helpSheetScroll: {
+    maxHeight: 560,
+  },
+  helpSheetTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    marginBottom: Spacing.lg,
+  },
+  helpTopic: {
+    marginBottom: Spacing.lg,
+  },
+  helpTopicTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+  },
+  helpTopicBody: {
+    marginTop: Spacing.xxs,
+    fontSize: FontSize.sm,
+    lineHeight: 20,
+  },
+  helpSheetButton: {
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
 });

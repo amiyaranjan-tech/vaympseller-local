@@ -150,7 +150,15 @@ export function initNotifications() {
   // all. Displayed as a real system notification (see localNotifications.ts)
   // rather than an in-app toast, so it looks and behaves the same as the
   // background case.
+  //
+  // Invalidated here (arrival), not just on tap (handleMessageTap) — a
+  // seller already sitting in the app (e.g. on the Orders tab) needs the
+  // tab badge/bell count to update the instant a push lands, not only
+  // after they act on it. See useUnreadNewOrdersCount.ts, the Orders tab
+  // badge's own query.
   onMessage(message => {
+    void queryClient.invalidateQueries({ queryKey: ['seller-notifications'] });
+
     const notification = message.notification;
     if (!notification) return;
 

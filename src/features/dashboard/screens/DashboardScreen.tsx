@@ -1,12 +1,15 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Bell,
   ChartColumnIncreasing,
+  Check,
+  ChevronDown,
+  ChevronUp,
   Clock3,
   IndianRupee,
   LayoutGrid,
@@ -19,12 +22,14 @@ import {
 
 import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
+import { BottomSheet } from '../../../components/common/BottomSheet';
 import { useThemeColors } from '../../../store/themeStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToast } from '../../../components/feedback/Toast';
 import { useMe } from '../../auth/hooks/useMe';
 import { updateShopStatus } from '../../shop/shop.api';
 import { useUnreadNotificationsCount } from '../../notifications/useUnreadCount';
+import { getProducts } from '../../products/products.api';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import {
@@ -61,6 +66,14 @@ function StatTile({
   );
 }
 
+// ponytail: no /seller/dashboard endpoint exists yet (see the "Coming
+// soon" chart card below), so picking a period only changes the caption
+// text on the Revenue/Orders tiles for now — the values themselves stay
+// the seller's all-time totals. Wire this to real period-scoped numbers
+// once that endpoint lands.
+const PERIOD_OPTIONS = ['Today', '3 Days', 'This Week', 'This Month', 'Last 6 Months'] as const;
+type Period = (typeof PERIOD_OPTIONS)[number];
+
 type DashboardNav = BottomTabNavigationProp<MainTabParamList, 'Dashboard'>;
 
 export function DashboardScreen() {
@@ -71,7 +84,26 @@ export function DashboardScreen() {
   const seller = useAuthStore(state => state.seller);
   const updateSeller = useAuthStore(state => state.updateSeller);
   const unreadCount = useUnreadNotificationsCount();
-  useMe();
+  const meQuery = useMe();
+
+  const [period, setPeriod] = useState<Period>('This Month');
+  const [periodOpen, setPeriodOpen] = useState(false);
+
+  // seller.products (from the seller profile) is a stored counter nothing
+  // in the backend ever increments on create/delete — it's permanently
+  // stale. The real count, same way ProductsScreen.tsx gets its own tab
+  // counts: a limit:1 list call, reading pagination.total.
+  const productsCountQuery = useQuery({
+    queryKey: ['seller-products', 'count', 'all'],
+    queryFn: () => getProducts({ limit: 1 }),
+    staleTime: 30000,
+  });
+
+  const isRefreshing = meQuery.isRefetching || productsCountQuery.isRefetching;
+  const onRefresh = () => {
+    void meQuery.refetch();
+    void productsCountQuery.refetch();
+  };
 
   const shopName = seller?.shopName ?? 'your shop';
   const isOpen = seller?.shopStatus === 'open';
@@ -94,7 +126,17 @@ export function DashboardScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+      >
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={[styles.greetingSmall, { color: colors.textSecondary }]}>
@@ -153,7 +195,16 @@ export function DashboardScreen() {
             </View>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Overview</Text>
           </View>
-          <Text style={[styles.viewAll, { color: colors.textSecondary }]}>View all</Text>
+          <Pressable onPress={() => setPeriodOpen(true)} style={styles.periodButton}>
+            <Text style={[styles.periodButtonLabel, { color: colors.textSecondary }]}>
+              {period}
+            </Text>
+            {periodOpen ? (
+              <ChevronUp size={16} color={colors.textSecondary} />
+            ) : (
+              <ChevronDown size={16} color={colors.textSecondary} />
+            )}
+          </Pressable>
         </View>
 
         <View style={styles.grid}>
@@ -162,7 +213,7 @@ export function DashboardScreen() {
             tint={colors.success}
             value={seller?.revenue ?? 0}
             label="Revenue"
-            caption="-- vs yesterday"
+            caption={`-- vs ${period.toLowerCase()}`}
             captionColor={colors.textSecondary}
           />
           <StatTile
@@ -170,13 +221,13 @@ export function DashboardScreen() {
             tint={colors.info}
             value={seller?.orders ?? 0}
             label="Orders"
-            caption="-- vs yesterday"
+            caption={`-- vs ${period.toLowerCase()}`}
             captionColor={colors.textSecondary}
           />
           <StatTile
             icon={<Package size={20} color={colors.fulfillmentProcessing} />}
             tint={colors.fulfillmentProcessing}
-            value={seller?.products ?? 0}
+            value={productsCountQuery.data?.pagination.total ?? 0}
             label="Products"
             caption="-- total products"
             captionColor={colors.fulfillmentProcessing}
@@ -238,6 +289,25 @@ export function DashboardScreen() {
           </View>
         </Card>
       </ScrollView>
+
+      <BottomSheet visible={periodOpen} onClose={() => setPeriodOpen(false)}>
+        <Text style={[styles.periodSheetTitle, { color: colors.textPrimary }]}>Period</Text>
+        {PERIOD_OPTIONS.map(option => (
+          <Pressable
+            key={option}
+            onPress={() => {
+              setPeriod(option);
+              setPeriodOpen(false);
+            }}
+            style={styles.periodSheetRow}
+          >
+            <Text style={[styles.periodSheetRowLabel, { color: colors.textPrimary }]}>
+              {option}
+            </Text>
+            {option === period && <Check size={18} color={colors.accent} />}
+          </Pressable>
+        ))}
+      </BottomSheet>
     </Screen>
   );
 }
@@ -325,8 +395,28 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
   },
-  viewAll: {
+  periodButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xxs,
+  },
+  periodButtonLabel: {
     fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+  },
+  periodSheetTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    marginBottom: Spacing.sm,
+  },
+  periodSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.md,
+  },
+  periodSheetRowLabel: {
+    fontSize: FontSize.md,
   },
   grid: {
     flexDirection: 'row',

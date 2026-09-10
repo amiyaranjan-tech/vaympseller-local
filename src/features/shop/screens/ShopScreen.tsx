@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -26,6 +26,8 @@ import { useThemeColors } from '../../../store/themeStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { getNotifications, markNotificationRead } from '../../notifications/notifications.api';
 import { NotificationRow } from '../../notifications/notificationDisplay';
+import { navigateFromNotification } from '../../notifications/notificationNavigation';
+import { useMe } from '../../auth/hooks/useMe';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import {
@@ -87,6 +89,13 @@ export function ShopScreen() {
     queryKey: ['seller-notifications', 'list'],
     queryFn: () => getNotifications({ limit: 100 }),
   });
+  const meQuery = useMe();
+
+  const isRefreshing = notificationsQuery.isRefetching || meQuery.isRefetching;
+  const onRefresh = () => {
+    void notificationsQuery.refetch();
+    void meQuery.refetch();
+  };
 
   const recentNotifications = (notificationsQuery.data?.items ?? []).slice(0, 4);
 
@@ -97,7 +106,17 @@ export function ShopScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+      >
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={[styles.title, { color: colors.textPrimary }]}>Shop</Text>
@@ -173,40 +192,6 @@ export function ShopScreen() {
           </Card>
         </Pressable>
 
-        <Text style={[styles.sectionTitle, { marginTop: Spacing.xl, color: colors.textPrimary }]}>
-          Quick Actions
-        </Text>
-        <View style={styles.quickGrid}>
-          <QuickAction
-            icon={<ShoppingBag size={22} color={colors.fulfillmentProcessing} />}
-            tint={colors.fulfillmentProcessing}
-            label="Add Product"
-            onPress={() => navigation.navigate(ROUTES.PRODUCTS)}
-            colors={colors}
-          />
-          <QuickAction
-            icon={<ClipboardList size={22} color={colors.info} />}
-            tint={colors.info}
-            label="Manage Orders"
-            onPress={() => navigation.navigate(ROUTES.ORDERS)}
-            colors={colors}
-          />
-          <QuickAction
-            icon={<Percent size={22} color={colors.warning} />}
-            tint={colors.warning}
-            label="Create Offer"
-            onPress={() => mainStack?.navigate(ROUTES.OFFERS)}
-            colors={colors}
-          />
-          <QuickAction
-            icon={<ImageIcon size={22} color={colors.success} />}
-            tint={colors.success}
-            label="Edit Shop Banner"
-            onPress={() => mainStack?.navigate(ROUTES.SHOP_DETAILS, { openBranding: true })}
-            colors={colors}
-          />
-        </View>
-
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notifications</Text>
           {recentNotifications.length > 0 && (
@@ -248,11 +233,45 @@ export function ShopScreen() {
               colors={colors}
               onPress={() => {
                 if (!item.isRead) markReadMutation.mutate(item._id);
-                mainStack?.navigate(ROUTES.NOTIFICATIONS);
+                if (mainStack) navigateFromNotification(item, mainStack);
               }}
             />
           ))
         )}
+
+        <Text style={[styles.sectionTitle, { marginTop: Spacing.xl, color: colors.textPrimary }]}>
+          Quick Actions
+        </Text>
+        <View style={styles.quickGrid}>
+          <QuickAction
+            icon={<ShoppingBag size={22} color={colors.fulfillmentProcessing} />}
+            tint={colors.fulfillmentProcessing}
+            label="Add Product"
+            onPress={() => navigation.navigate(ROUTES.PRODUCTS)}
+            colors={colors}
+          />
+          <QuickAction
+            icon={<ClipboardList size={22} color={colors.info} />}
+            tint={colors.info}
+            label="Manage Orders"
+            onPress={() => navigation.navigate(ROUTES.ORDERS)}
+            colors={colors}
+          />
+          <QuickAction
+            icon={<Percent size={22} color={colors.warning} />}
+            tint={colors.warning}
+            label="Create Offer"
+            onPress={() => mainStack?.navigate(ROUTES.OFFERS)}
+            colors={colors}
+          />
+          <QuickAction
+            icon={<ImageIcon size={22} color={colors.success} />}
+            tint={colors.success}
+            label="Edit Shop Banner"
+            onPress={() => mainStack?.navigate(ROUTES.SHOP_DETAILS, { openBranding: true })}
+            colors={colors}
+          />
+        </View>
       </ScrollView>
     </Screen>
   );
