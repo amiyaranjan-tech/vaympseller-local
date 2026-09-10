@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Bike, ChevronLeft, MapPin, Phone, User } from 'lucide-react-native';
+import { Bike, Box, ChevronLeft, MapPin, Phone, User } from 'lucide-react-native';
 
 import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
@@ -15,7 +15,7 @@ import { useThemeColors } from '../../../store/themeStore';
 import { useToast } from '../../../components/feedback/Toast';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
-import type { MainStackParamList } from '../../../navigation/routeConfig';
+import { ROUTES, type MainStackParamList } from '../../../navigation/routeConfig';
 import {
   getOrder,
   acceptOrder,
@@ -26,6 +26,15 @@ import {
 
 type Nav = NativeStackNavigationProp<MainStackParamList, 'OrderDetail'>;
 type Route = RouteProp<MainStackParamList, 'OrderDetail'>;
+
+// Mirrors products.api.ts's own deal-type label mapping (ProductDetailsScreen's
+// DEAL_TYPE_META) — an order item just needs the label, not the icon/tint.
+const DEAL_TYPE_LABEL: Record<string, string> = {
+  bogo: 'BOGO',
+  tier_amount: 'Deal applied',
+  tier_percentage: 'Deal applied',
+  free_shipping: 'Free shipping',
+};
 
 const STATUS_TONE: Record<OrderFulfillmentStatus, BadgeTone> = {
   Pending: 'warning',
@@ -177,24 +186,69 @@ export function OrderDetailScreen() {
 
             <Card>
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Items</Text>
-              {order.items.map((item, index) => (
-                <View
-                  key={`${item.product ?? item.name}-${index}`}
-                  style={[styles.itemRow, index > 0 && { borderTopColor: colors.divider, borderTopWidth: StyleSheet.hairlineWidth }]}
-                >
-                  <View style={styles.itemInfo}>
-                    <Text style={[styles.itemName, { color: colors.textPrimary }]} numberOfLines={2}>
-                      {item.name}
-                    </Text>
-                    <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>
-                      {item.size ? `Size ${item.size} · ` : ''}Qty {item.quantity}
-                    </Text>
-                  </View>
-                  <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>
-                    ₹{(item.price * item.quantity).toFixed(0)}
-                  </Text>
-                </View>
-              ))}
+              {order.items.map((item, index) => {
+                const dealLabel = item.isFreeItem
+                  ? 'FREE item'
+                  : item.dealType
+                    ? DEAL_TYPE_LABEL[item.dealType]
+                    : null;
+                const hasMarkdown = item.originalPrice > item.price;
+
+                return (
+                  <Pressable
+                    key={`${item.product ?? item.name}-${index}`}
+                    disabled={!item.product}
+                    onPress={() =>
+                      item.product && navigation.navigate(ROUTES.PRODUCT_DETAILS, { productId: item.product })
+                    }
+                    style={[styles.itemRow, index > 0 && { borderTopColor: colors.divider, borderTopWidth: StyleSheet.hairlineWidth }]}
+                  >
+                    {item.image ? (
+                      <Image source={{ uri: item.image }} style={styles.itemImage} />
+                    ) : (
+                      <View style={[styles.itemImage, styles.itemImageFallback, { backgroundColor: colors.grey100 }]}>
+                        <Box size={22} color={colors.textLight} />
+                      </View>
+                    )}
+
+                    <View style={styles.itemInfo}>
+                      <Text style={[styles.itemName, { color: colors.textPrimary }]} numberOfLines={2}>
+                        {item.name}
+                      </Text>
+                      {!!item.brand && (
+                        <Text style={[styles.itemBrand, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {item.brand}
+                        </Text>
+                      )}
+                      <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>
+                        {item.size ? `Size ${item.size} · ` : ''}Qty {item.quantity}
+                      </Text>
+                      {!!dealLabel && (
+                        <View style={styles.dealBadgeRow}>
+                          <Badge label={dealLabel} tone="warning" />
+                        </View>
+                      )}
+                    </View>
+
+                    <View style={styles.itemPriceCol}>
+                      {item.isFreeItem ? (
+                        <Text style={[styles.itemPrice, { color: colors.success }]}>FREE</Text>
+                      ) : (
+                        <>
+                          {hasMarkdown && (
+                            <Text style={[styles.itemOriginalPrice, { color: colors.textLight }]}>
+                              ₹{(item.originalPrice * item.quantity).toFixed(0)}
+                            </Text>
+                          )}
+                          <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>
+                            ₹{(item.price * item.quantity).toFixed(0)}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                  </Pressable>
+                );
+              })}
             </Card>
 
             <Card>
@@ -370,21 +424,44 @@ const styles = StyleSheet.create({
   },
   itemRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingVertical: Spacing.sm,
+  },
+  itemImage: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.md,
+  },
+  itemImageFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   itemInfo: {
     flex: 1,
+    marginLeft: Spacing.sm,
     marginRight: Spacing.sm,
   },
   itemName: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
   },
+  itemBrand: {
+    marginTop: 2,
+    fontSize: FontSize.xs,
+  },
   itemMeta: {
     marginTop: 2,
     fontSize: FontSize.xs,
+  },
+  dealBadgeRow: {
+    marginTop: Spacing.xs,
+  },
+  itemPriceCol: {
+    alignItems: 'flex-end',
+  },
+  itemOriginalPrice: {
+    fontSize: FontSize.xs,
+    textDecorationLine: 'line-through',
   },
   itemPrice: {
     fontSize: FontSize.sm,
