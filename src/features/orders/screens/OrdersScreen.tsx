@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
+  Bike,
   Check,
   CircleCheck,
   CircleX,
@@ -256,6 +257,14 @@ export function OrdersScreen() {
                     <Text style={[styles.orderRowMeta, { color: colors.textSecondary }]}>
                       {order.customer.name} · ₹{order.total.toFixed(0)}
                     </Text>
+                    {order.fulfillment.rider && (
+                      <View style={styles.orderRowRider}>
+                        <Bike size={12} color={colors.success} />
+                        <Text style={[styles.orderRowRiderLabel, { color: colors.success }]} numberOfLines={1}>
+                          {order.fulfillment.rider.name}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <Badge
                     label={order.fulfillment.sellerStatus}
@@ -487,6 +496,17 @@ const styles = StyleSheet.create({
   orderRowMeta: {
     marginTop: 2,
     fontSize: FontSize.xs,
+  },
+  orderRowRider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  orderRowRiderLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.medium,
+    flexShrink: 1,
   },
   sectionHeader: {
     marginTop: Spacing.xl,
