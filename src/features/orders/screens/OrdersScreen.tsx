@@ -386,6 +386,7 @@ const styles = StyleSheet.create({
   },
   searchRow: {
     marginTop: Spacing.lg,
+    marginBottom: Spacing.lg,
     flexDirection: 'row',
     gap: Spacing.sm,
   },
@@ -418,7 +419,6 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
   emptyCard: {
-    marginTop: Spacing.lg,
     alignItems: 'center',
     paddingVertical: Spacing.xxxl,
   },
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
     minWidth: 200,
   },
   skeletonBlock: {
-    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   orderRow: {
     flexDirection: 'row',

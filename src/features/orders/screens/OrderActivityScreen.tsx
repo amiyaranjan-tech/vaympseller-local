@@ -34,8 +34,11 @@ function timeAgo(iso: string): string {
 // refetching separately.
 export function OrderActivityScreen() {
   const { colors } = useThemeColors();
+  // Already a direct sibling of OrderDetail on MainNavigator's own stack
+  // (see routeConfig.ts/MainNavigator.tsx) — unlike OrdersScreen (a tab
+  // screen, which needs .getParent() to reach that stack), this navigates
+  // to it directly.
   const navigation = useNavigation<Nav>();
-  const mainStack = navigation.getParent<NativeStackNavigationProp<MainStackParamList>>();
 
   const ordersQuery = useQuery({
     queryKey: ['seller-orders', 'list'],
@@ -86,7 +89,7 @@ export function OrderActivityScreen() {
               <View key={order._id}>
                 <Pressable
                   style={styles.row}
-                  onPress={() => mainStack?.navigate(ROUTES.ORDER_DETAIL, { orderId: order._id })}
+                  onPress={() => navigation.navigate(ROUTES.ORDER_DETAIL, { orderId: order._id })}
                 >
                   <View style={[styles.rowIcon, { backgroundColor: `${colors.info}20` }]}>
                     <Package size={18} color={colors.info} />
