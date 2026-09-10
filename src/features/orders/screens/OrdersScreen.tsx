@@ -1,15 +1,15 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
+  Check,
   CircleCheck,
   CircleX,
   ClipboardList,
   Clock3,
-  Filter,
   Package,
   Search,
   ShoppingBag,
@@ -23,6 +23,7 @@ import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { Badge, type BadgeTone } from '../../../components/common/Badge';
+import { BottomSheet } from '../../../components/common/BottomSheet';
 import { Skeleton } from '../../../components/feedback/Skeleton';
 import { useThemeColors } from '../../../store/themeStore';
 import { Spacing, Radius } from '../../../theme/spacing';
@@ -75,6 +76,29 @@ const STATUS_TONE: Record<OrderFulfillmentStatus, BadgeTone> = {
   Cancelled: 'error',
 };
 
+type SortKey = 'newest' | 'oldest' | 'amount_high' | 'amount_low';
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'newest', label: 'Newest first' },
+  { key: 'oldest', label: 'Oldest first' },
+  { key: 'amount_high', label: 'Amount: High to Low' },
+  { key: 'amount_low', label: 'Amount: Low to High' },
+];
+
+function sortOrders(orders: Order[], sortBy: SortKey): Order[] {
+  const sorted = [...orders];
+  switch (sortBy) {
+    case 'newest':
+      return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    case 'oldest':
+      return sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    case 'amount_high':
+      return sorted.sort((a, b) => b.total - a.total);
+    case 'amount_low':
+      return sorted.sort((a, b) => a.total - b.total);
+  }
+}
+
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diffMs / 60000);
@@ -97,7 +121,15 @@ export function OrdersScreen() {
     queryFn: () => getOrders({ limit: 100 }),
   });
 
-  const orders = ordersQuery.data?.items ?? [];
+  const orders = useMemo(() => ordersQuery.data?.items ?? [], [ordersQuery.data]);
+
+  const [sortBy, setSortBy] = useState<SortKey>('newest');
+  const [sortSheetOpen, setSortSheetOpen] = useState(false);
+
+  // Recent activity and the stat counts always reflect the real
+  // chronological/total picture regardless of the chosen sort — only the
+  // main order list below reorders.
+  const sortedOrders = useMemo(() => sortOrders(orders, sortBy), [orders, sortBy]);
 
   const counts: Record<(typeof STAT_DEFS)[number]['key'], number> = {
     total: orders.length,
@@ -126,34 +158,33 @@ export function OrdersScreen() {
               Manage and fulfill customer orders
             </Text>
           </View>
-          <View style={styles.headerActions}>
-            <Pressable style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Search size={18} color={colors.textPrimary} />
-            </Pressable>
-            <Pressable style={[styles.filterButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Filter size={16} color={colors.textPrimary} />
-              <Text style={[styles.filterLabel, { color: colors.textPrimary }]}>Filter</Text>
-              <View style={[styles.filterDot, { backgroundColor: colors.warning }]} />
-            </Pressable>
-          </View>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statRow}>
+        <View style={styles.statGrid}>
           {STAT_DEFS.map(def => {
             const Icon = def.icon;
             const tint = def.tint(colors);
             return (
-              <View key={def.key} style={[styles.statTile, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View
+                key={def.key}
+                style={[
+                  styles.statTile,
+                  { backgroundColor: colors.card, borderColor: colors.border, borderLeftColor: tint },
+                ]}
+              >
                 <View style={[styles.statIcon, { backgroundColor: `${tint}20` }]}>
-                  <Icon size={18} color={tint} />
+                  <Icon size={16} color={tint} />
                 </View>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{def.label}</Text>
-                <Text style={[styles.statValue, { color: colors.textPrimary }]}>{counts[def.key]}</Text>
-                <View style={[styles.statUnderline, { backgroundColor: tint }]} />
+                <View style={styles.statTileText}>
+                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{counts[def.key]}</Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {def.label}
+                  </Text>
+                </View>
               </View>
             );
           })}
-        </ScrollView>
+        </View>
 
         <View style={styles.searchRow}>
           <View style={[styles.searchBox, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
@@ -164,7 +195,10 @@ export function OrdersScreen() {
               style={[styles.searchInput, { color: colors.textPrimary }]}
             />
           </View>
-          <Pressable style={[styles.sortButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+          <Pressable
+            onPress={() => setSortSheetOpen(true)}
+            style={[styles.sortButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
+          >
             <SlidersHorizontal size={16} color={colors.textPrimary} />
             <Text style={[styles.sortLabel, { color: colors.textPrimary }]}>Sort</Text>
           </Pressable>
@@ -202,7 +236,7 @@ export function OrdersScreen() {
           </Card>
         ) : (
           <Card style={styles.activityCard}>
-            {orders.map((order: Order, index) => (
+            {sortedOrders.map((order: Order, index) => (
               <View key={order._id}>
                 <Pressable style={styles.orderRow} onPress={() => goToOrder(order._id)}>
                   <View style={styles.orderRowInfo}>
@@ -219,7 +253,7 @@ export function OrdersScreen() {
                   />
                   <ChevronRight size={20} color={colors.textLight} />
                 </Pressable>
-                {index < orders.length - 1 && (
+                {index < sortedOrders.length - 1 && (
                   <View style={[styles.divider, { backgroundColor: colors.divider }]} />
                 )}
               </View>
@@ -262,6 +296,34 @@ export function OrdersScreen() {
           </>
         )}
       </ScrollView>
+
+      <BottomSheet visible={sortSheetOpen} onClose={() => setSortSheetOpen(false)}>
+        <Text style={[styles.sortSheetTitle, { color: colors.textPrimary }]}>Sort orders by</Text>
+        {SORT_OPTIONS.map(option => {
+          const isSelected = option.key === sortBy;
+          return (
+            <Pressable
+              key={option.key}
+              onPress={() => {
+                setSortBy(option.key);
+                setSortSheetOpen(false);
+              }}
+              style={styles.sortOptionRow}
+            >
+              <Text
+                style={[
+                  styles.sortOptionLabel,
+                  { color: isSelected ? colors.accent : colors.textPrimary },
+                  isSelected && { fontWeight: FontWeight.bold },
+                ]}
+              >
+                {option.label}
+              </Text>
+              {isSelected && <Check size={18} color={colors.accent} />}
+            </Pressable>
+          );
+        })}
+      </BottomSheet>
     </Screen>
   );
 }
@@ -288,69 +350,39 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xxs,
     fontSize: FontSize.sm,
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    borderWidth: 1,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    height: 40,
-  },
-  filterLabel: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.semibold,
-  },
-  filterDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statRow: {
+  statGrid: {
     marginTop: Spacing.lg,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.sm,
   },
   statTile: {
-    width: 84,
+    width: '31%',
+    flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: Radius.lg,
-    paddingVertical: Spacing.md,
+    borderLeftWidth: 3,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
   },
   statIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.md,
+    width: 30,
+    height: 30,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.xs,
+    marginRight: Spacing.xs,
+  },
+  statTileText: {
+    flexShrink: 1,
   },
   statLabel: {
     fontSize: FontSize.xxs,
   },
   statValue: {
-    marginTop: 2,
-    fontSize: FontSize.lg,
+    fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
-  },
-  statUnderline: {
-    marginTop: Spacing.sm,
-    width: '60%',
-    height: 2,
-    borderRadius: 1,
   },
   searchRow: {
     marginTop: Spacing.lg,
@@ -492,5 +524,19 @@ const styles = StyleSheet.create({
   divider: {
     height: StyleSheet.hairlineWidth,
     marginLeft: Spacing.lg + 44 + Spacing.md,
+  },
+  sortSheetTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    marginBottom: Spacing.md,
+  },
+  sortOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.md,
+  },
+  sortOptionLabel: {
+    fontSize: FontSize.sm,
   },
 });
