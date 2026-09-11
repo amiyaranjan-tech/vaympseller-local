@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,8 +8,6 @@ import {
   TextInput,
   useWindowDimensions,
   View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
 } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -60,10 +57,6 @@ import {
 type Colors = ReturnType<typeof useThemeColors>['colors'];
 type Nav = NativeStackNavigationProp<MainStackParamList, 'ProductDetails'>;
 type Route = RouteProp<MainStackParamList, 'ProductDetails'>;
-
-// Plain Pressable can't accept an Animated.Value in its style (e.g. the
-// hero deal badge's scroll-linked opacity) without this wrapper.
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const DEAL_TYPE_META: Record<OfferType, { label: string; icon: typeof Tag; tint: (c: Colors) => string }> = {
   bogo: { label: 'Buy One Get One', icon: ShoppingBag, tint: c => c.fulfillmentProcessing },
@@ -146,6 +139,57 @@ const DEAL_TYPE_OPTIONS: { type: OfferType; label: string; description: string; 
   { type: 'free_shipping', label: 'Free Shipping', description: 'Free shipping above a spend threshold', icon: Truck },
 ];
 
+// The product photo, as the first item inside each tab's own ScrollView
+// (not a separately-pinned/collapsing header) — same approach the
+// Consumer app's own product screen uses (a plain carousel that scrolls
+// away with the rest of the content). A hand-rolled collapsing header
+// (shrinking on scroll, or pinned behind an overlay) kept being janky or
+// stealing touches from the carousel/badge under it; this has none of
+// that — it's just normal ScrollView scrolling, so it's always smooth.
+function ProductHero({
+  product,
+  colors,
+  width,
+  height,
+  onDealPress,
+}: {
+  product: Product;
+  colors: Colors;
+  width: number;
+  height: number;
+  onDealPress?: () => void;
+}) {
+  return (
+    <View style={[styles.heroWrap, { height }]}>
+      <ImageCarousel
+        images={product.images}
+        width={width}
+        height={height}
+        fallback={
+          <View style={[styles.heroImage, styles.heroImageFallback, { backgroundColor: colors.grey100 }]}>
+            <Box size={32} color={colors.textLight} />
+          </View>
+        }
+      />
+
+      {product.dealType !== 'none' && (() => {
+        const dealMeta = DEAL_TYPE_META[product.dealType];
+        const DealIcon = dealMeta.icon;
+        return (
+          <Pressable
+            onPress={onDealPress}
+            disabled={!onDealPress}
+            style={[styles.heroDealBadge, { backgroundColor: colors.warning }]}
+          >
+            <DealIcon size={13} color={colors.textInverse} />
+            <Text style={styles.heroDealBadgeLabel}>{dealMeta.label}</Text>
+          </Pressable>
+        );
+      })()}
+    </View>
+  );
+}
+
 export function ProductDetailsScreen() {
   const { colors } = useThemeColors();
   const navigation = useNavigation<Nav>();
@@ -154,6 +198,10 @@ export function ProductDetailsScreen() {
   const { productId } = params;
   const { width: windowWidth } = useWindowDimensions();
   const carouselWidth = windowWidth - Spacing.lg * 2;
+  // Same ratio as the Consumer app's own product screen carousel
+  // (src/components/products/ProductCarousel.tsx's CARD_HEIGHT = width *
+  // 1.12), so a product photo reads the same size/crop in both apps.
+  const carouselHeight = carouselWidth * 1.12;
 
   const [tab, setTab] = useState<'details' | 'deals'>(params.tab ?? 'details');
   const [showUnverifiedGate, setShowUnverifiedGate] = useState(false);
@@ -161,31 +209,6 @@ export function ProductDetailsScreen() {
   const productQuery = useQuery({
     queryKey: ['seller-products', 'detail', productId],
     queryFn: () => getProduct(productId),
-  });
-
-  // Collapsing hero: the carousel shrinks as the active tab's own
-  // ScrollView scrolls (see the `onScroll` prop threaded into
-  // DetailsTab/DealsTab below). Height can't run on the native driver,
-  // but this is a slow, occasional gesture, not a 60fps-critical one.
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false },
-  );
-  const heroHeight = scrollY.interpolate({
-    inputRange: [0, 180],
-    outputRange: [220, 0],
-    extrapolate: 'clamp',
-  });
-  const heroContentOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-  const heroMargin = scrollY.interpolate({
-    inputRange: [0, 180],
-    outputRange: [Spacing.md, 0],
-    extrapolate: 'clamp',
   });
 
   return (
@@ -226,59 +249,31 @@ export function ProductDetailsScreen() {
 
       {productQuery.isLoading ? (
         <View style={styles.loadingBlock}>
-          <Skeleton width="100%" height={200} radius={Radius.lg} />
+          <Skeleton width="100%" height={carouselHeight} radius={Radius.lg} />
         </View>
       ) : !productQuery.data ? (
         <View style={styles.loadingBlock}>
           <Text style={{ color: colors.textSecondary }}>Couldn't load this product.</Text>
         </View>
+      ) : tab === 'details' ? (
+        <DetailsTab
+          product={productQuery.data}
+          colors={colors}
+          isVerified={isVerified}
+          onNeedsVerification={() => setShowUnverifiedGate(true)}
+          carouselWidth={carouselWidth}
+          carouselHeight={carouselHeight}
+          onDealPress={() => setTab('deals')}
+        />
       ) : (
-        <>
-          <Animated.View style={[styles.heroWrap, { height: heroHeight, marginTop: heroMargin }]}>
-            <ImageCarousel
-              images={productQuery.data.images}
-              width={carouselWidth}
-              height={220}
-              fallback={
-                <View style={[styles.heroImage, styles.heroImageFallback, { backgroundColor: colors.grey100 }]}>
-                  <Box size={32} color={colors.textLight} />
-                </View>
-              }
-            />
-
-            {productQuery.data.dealType !== 'none' && (() => {
-              const dealMeta = DEAL_TYPE_META[productQuery.data.dealType];
-              const DealIcon = dealMeta.icon;
-              return (
-                <AnimatedPressable
-                  onPress={() => setTab('deals')}
-                  style={[styles.heroDealBadge, { backgroundColor: colors.warning, opacity: heroContentOpacity }]}
-                >
-                  <DealIcon size={13} color={colors.textInverse} />
-                  <Text style={styles.heroDealBadgeLabel}>{dealMeta.label}</Text>
-                </AnimatedPressable>
-              );
-            })()}
-          </Animated.View>
-
-          {tab === 'details' ? (
-            <DetailsTab
-              product={productQuery.data}
-              colors={colors}
-              isVerified={isVerified}
-              onNeedsVerification={() => setShowUnverifiedGate(true)}
-              onScroll={handleScroll}
-            />
-          ) : (
-            <DealsTab
-              product={productQuery.data}
-              colors={colors}
-              isVerified={isVerified}
-              onNeedsVerification={() => setShowUnverifiedGate(true)}
-              onScroll={handleScroll}
-            />
-          )}
-        </>
+        <DealsTab
+          product={productQuery.data}
+          colors={colors}
+          isVerified={isVerified}
+          onNeedsVerification={() => setShowUnverifiedGate(true)}
+          carouselWidth={carouselWidth}
+          carouselHeight={carouselHeight}
+        />
       )}
 
       <UnverifiedGateModal
@@ -294,13 +289,17 @@ function DetailsTab({
   colors,
   isVerified,
   onNeedsVerification,
-  onScroll,
+  carouselWidth,
+  carouselHeight,
+  onDealPress,
 }: {
   product: Product;
   colors: Colors;
   isVerified: boolean;
   onNeedsVerification: () => void;
-  onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  carouselWidth: number;
+  carouselHeight: number;
+  onDealPress: () => void;
 }) {
   const toast = useToast();
   const navigation = useNavigation<Nav>();
@@ -309,12 +308,15 @@ function DetailsTab({
   const [name, setName] = useState(product.name);
   const [description, setDescription] = useState(product.description);
   const [tags, setTags] = useState(product.tags.join(', '));
-  const [costPrice, setCostPrice] = useState(String(product.costPrice));
   const [sellingPrice, setSellingPrice] = useState(String(product.sellingPrice));
-  const [discountPercent, setDiscountPercent] = useState(String(product.discountPercent));
+  // A product created before this field existed has no sellerPrice yet —
+  // fall back to its current finalPrice (what it already sells for) so
+  // opening this screen never silently zeroes out its pricing on save.
+  const [sellerPrice, setSellerPrice] = useState(
+    String(product.sellerPrice ?? product.finalPrice),
+  );
   const [isReturnable, setIsReturnable] = useState(product.isReturnable);
   const [tryAndBuy, setTryAndBuy] = useState(product.tryAndBuy);
-  const [isBogo, setIsBogo] = useState(product.isBogo);
   const [images, setImages] = useState<PickerImage[]>(product.images);
 
   // Re-sync local edit state whenever a fresh product loads (e.g. after
@@ -323,19 +325,20 @@ function DetailsTab({
     setName(product.name);
     setDescription(product.description);
     setTags(product.tags.join(', '));
-    setCostPrice(String(product.costPrice));
     setSellingPrice(String(product.sellingPrice));
-    setDiscountPercent(String(product.discountPercent));
+    setSellerPrice(String(product.sellerPrice ?? product.finalPrice));
     setIsReturnable(product.isReturnable);
     setTryAndBuy(product.tryAndBuy);
-    setIsBogo(product.isBogo);
     setImages(product.images);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product._id, product.updatedAt]);
 
-  const finalPrice = Math.round(
-    (Number(sellingPrice) || 0) * (1 - (Number(discountPercent) || 0) / 100),
-  );
+  const yourDiscountPercent = (() => {
+    const total = Number(sellingPrice) || 0;
+    const seller = Number(sellerPrice) || 0;
+    if (total <= 0) return 0;
+    return Math.max(0, Math.round(((total - seller) / total) * 100));
+  })();
 
   const saveMutation = useMutation({
     mutationFn: (payload: Partial<ProductPayload>) => updateProduct(product._id, payload),
@@ -364,18 +367,24 @@ function DetailsTab({
       name,
       description,
       tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-      costPrice: Number(costPrice) || 0,
       sellingPrice: Number(sellingPrice) || 0,
-      discountPercent: Number(discountPercent) || 0,
+      sellerPrice: Number(sellerPrice) || 0,
       isReturnable,
       tryAndBuy,
-      isBogo,
       images,
     });
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content} onScroll={onScroll} scrollEventThrottle={16}>
+    <ScrollView contentContainerStyle={styles.content}>
+      <ProductHero
+        product={product}
+        colors={colors}
+        width={carouselWidth}
+        height={carouselHeight}
+        onDealPress={onDealPress}
+      />
+
       <Card style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Photos</Text>
         <ProductImagePicker images={images} onChange={setImages} />
@@ -428,20 +437,18 @@ function DetailsTab({
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Pricing</Text>
         <View style={styles.row}>
           <View style={styles.col}>
-            <FieldLabel label="Cost Price" required colors={colors} />
-            <CountedInput value={costPrice} onChangeText={setCostPrice} placeholder="0" maxLength={10} keyboardType="number-pad" colors={colors} />
-          </View>
-          <View style={styles.col}>
-            <FieldLabel label="Selling Price" required colors={colors} />
+            <FieldLabel label="Total Price" required colors={colors} />
             <CountedInput value={sellingPrice} onChangeText={setSellingPrice} placeholder="0" maxLength={10} keyboardType="number-pad" colors={colors} />
           </View>
+          <View style={styles.col}>
+            <FieldLabel label="Discounted Price" required colors={colors} />
+            <CountedInput value={sellerPrice} onChangeText={setSellerPrice} placeholder="0" maxLength={10} keyboardType="number-pad" colors={colors} />
+          </View>
         </View>
-        <FieldLabel label="Discount %" colors={colors} />
-        <CountedInput value={discountPercent} onChangeText={setDiscountPercent} placeholder="0" maxLength={3} keyboardType="number-pad" colors={colors} />
         <View style={[styles.finalPriceRow, { borderTopColor: colors.divider }]}>
-          <Text style={[styles.finalPriceLabel, { color: colors.textSecondary }]}>Final Price</Text>
+          <Text style={[styles.finalPriceLabel, { color: colors.textSecondary }]}>You get paid</Text>
           <Text style={[styles.finalPriceValue, { color: colors.textPrimary }]}>
-            ₹{finalPrice.toLocaleString('en-IN')}
+            ₹{(Number(sellerPrice) || 0).toLocaleString('en-IN')} ({yourDiscountPercent}% off)
           </Text>
         </View>
       </Card>
@@ -467,13 +474,11 @@ function DetailsTab({
           onToggle={() => setTryAndBuy(v => !v)}
           colors={colors}
         />
-        <FlagCheckbox
-          title="BOGO"
-          description="This product can be used in BOGO offers"
-          checked={isBogo}
-          onToggle={() => setIsBogo(v => !v)}
-          colors={colors}
-        />
+        {!isReturnable && (
+          <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+            Non-returnable products aren't eligible for Try & Buy.
+          </Text>
+        )}
       </Card>
 
       <View style={styles.footer}>
@@ -494,13 +499,15 @@ function DealsTab({
   colors,
   isVerified,
   onNeedsVerification,
-  onScroll,
+  carouselWidth,
+  carouselHeight,
 }: {
   product: Product;
   colors: Colors;
   isVerified: boolean;
   onNeedsVerification: () => void;
-  onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  carouselWidth: number;
+  carouselHeight: number;
 }) {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -565,7 +572,9 @@ function DealsTab({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content} onScroll={onScroll} scrollEventThrottle={16}>
+    <ScrollView contentContainerStyle={styles.content}>
+      <ProductHero product={product} colors={colors} width={carouselWidth} height={carouselHeight} />
+
       <Pressable onPress={openAddSheet} style={[styles.addDealButton, { borderColor: colors.accent }]}>
         <Plus size={16} color={colors.accent} />
         <Text style={[styles.addDealLabel, { color: colors.accent }]}>Add Deal</Text>
@@ -908,6 +917,11 @@ function DealForm({
 }
 
 const styles = StyleSheet.create({
+  helperText: {
+    marginTop: -Spacing.xs,
+    marginBottom: Spacing.sm,
+    fontSize: FontSize.xs,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -959,9 +973,11 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     paddingBottom: Spacing.xxxl,
   },
+  // First item inside each tab's own ScrollView content (see
+  // ProductHero) — a normal flex-flow block, not a pinned/absolute one,
+  // so it just scrolls away with everything else like any other item.
   heroWrap: {
-    marginTop: Spacing.md,
-    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
     borderRadius: Radius.lg,
     overflow: 'hidden',
   },
@@ -983,7 +999,7 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     width: '100%',
-    height: 220,
+    height: '100%',
     borderRadius: Radius.lg,
   },
   heroImageFallback: {

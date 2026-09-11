@@ -27,8 +27,22 @@ export const registerSchema = z
     city: z.string().trim().min(1, 'City is required'),
     state: z.string().trim().min(1, 'State is required'),
     postalCode: z.string().trim().min(1, 'Postal code is required'),
-    gstNumber: z.string().trim(),
-    businessRegistration: z.string().trim(),
+    // Required — mirrors the admin app's own seller.schema.ts
+    // (gstNumber/businessRegistration are `.required()` in BOTH
+    // validations/sellerAuth.validation.js AND validations/seller.validation.js's
+    // createSellerSchema on the backend, so a seller self-registering isn't
+    // held to a looser standard than one an admin provisions manually).
+    // Previously unvalidated here (bare z.string().trim()), which let an
+    // empty submission pass client-side only to fail against the backend's
+    // real requirement — same min-length rules as the admin form. GSTIN is
+    // always exactly 15 characters, so that's the one extra check worth
+    // adding here — NOT the full letter/digit-position GSTIN pattern:
+    // neither the admin form nor the backend enforce that real-world shape
+    // today (both just check presence), so holding self-registration to a
+    // stricter bar than either of those would reject values an admin could
+    // still enter by hand.
+    gstNumber: z.string().trim().toUpperCase().length(15, 'GST number must be 15 characters'),
+    businessRegistration: z.string().trim().min(3, 'Business registration number is required'),
     bank: bankSchema,
   })
   .refine(values => values.password === values.confirmPassword, {

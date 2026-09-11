@@ -5,7 +5,6 @@ import { Plus, X } from 'lucide-react-native';
 
 import { useThemeColors } from '../../store/themeStore';
 import { useToast } from '../feedback/Toast';
-import { uploadImageToCloudinary } from '../../utils/cloudinaryUpload';
 import { Spacing, Radius } from '../../theme/spacing';
 
 export interface PickerImage {
@@ -22,38 +21,52 @@ interface ProductImagePickerProps {
 
 const TILE = 84;
 
-// Direct-to-Cloudinary upload (see utils/cloudinaryUpload.ts) — the
-// backend never sees the file bytes, just hands back a signed upload URL.
-// Local-only until Save/Save Changes actually persists the resulting
-// `images` array on the product.
+// ponytail: no Cloudinary for now — the picked photo is base64-encoded
+// on-device into a `data:` URI and stored directly in the product's own
+// `images[].url` (Mongo document, no separate upload/CDN step). Simple
+// and always works, but every image now lives inline in the product
+// document: MongoDB caps a document at 16MB, and Express's JSON body
+// limit here is 10mb (server.js), so this doesn't scale to many/large
+// photos. maxWidth/maxHeight below keeps each photo small enough that a
+// handful comfortably fit either limit. Swap back to real Cloudinary
+// upload (see git history for utils/cloudinaryUpload.ts) once that
+// matters.
 export function ProductImagePicker({ images, onChange, max = 6 }: ProductImagePickerProps) {
   const { colors } = useThemeColors();
   const toast = useToast();
-  const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   const handleAdd = async () => {
-    if (uploading || images.length >= max) return;
+    if (processing || images.length >= max) return;
 
-    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.8, selectionLimit: 1 });
-    if (result.didCancel || !result.assets?.[0]?.uri) return;
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 0.8,
+      selectionLimit: 1,
+      includeBase64: true,
+      maxWidth: 1280,
+      maxHeight: 1280,
+    });
+    if (result.didCancel) return;
 
-    const asset = result.assets[0];
-    setUploading(true);
+    const asset = result.assets?.[0];
+    if (!asset?.base64) {
+      toast.show({ type: 'error', title: "Couldn't read that image" });
+      return;
+    }
+
+    setProcessing(true);
     try {
-      const uploaded = await uploadImageToCloudinary({
-        uri: asset.uri!,
-        name: asset.fileName ?? 'photo.jpg',
-        type: asset.type ?? 'image/jpeg',
-      });
-      onChange([...images, uploaded]);
-    } catch (error) {
-      toast.show({
-        type: 'error',
-        title: "Couldn't upload image",
-        message: error instanceof Error ? error.message : 'Something went wrong.',
-      });
+      const mimeType = asset.type ?? 'image/jpeg';
+      onChange([
+        ...images,
+        {
+          url: `data:${mimeType};base64,${asset.base64}`,
+          publicId: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        },
+      ]);
     } finally {
-      setUploading(false);
+      setProcessing(false);
     }
   };
 
@@ -79,10 +92,10 @@ export function ProductImagePicker({ images, onChange, max = 6 }: ProductImagePi
       {images.length < max && (
         <Pressable
           onPress={handleAdd}
-          disabled={uploading}
+          disabled={processing}
           style={[styles.addTile, { borderColor: colors.accent, backgroundColor: colors.accent10 }]}
         >
-          {uploading ? (
+          {processing ? (
             <ActivityIndicator color={colors.accent} />
           ) : (
             <Plus size={22} color={colors.accent} />

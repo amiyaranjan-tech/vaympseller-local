@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   AlertCircle,
   Clock3,
@@ -67,7 +67,11 @@ export function AccountStatusScreen() {
 
   return (
     <Screen>
-      <View style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
         <Image
           source={require('../../../assets/shopstatuslogo.png')}
           style={styles.heroImage}
@@ -215,7 +219,7 @@ export function AccountStatusScreen() {
             ) : undefined
           }
         />
-      </View>
+      </ScrollView>
     </Screen>
   );
 }
@@ -285,8 +289,12 @@ function StatusRow({
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scrollView: {
     flex: 1,
+  },
+
+  container: {
+    flexGrow: 1,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.xl,
     alignItems: 'center',

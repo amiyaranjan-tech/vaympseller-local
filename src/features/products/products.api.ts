@@ -42,8 +42,13 @@ export interface Product {
   tags: string[];
   productCollection: string;
   seller: string;
-  costPrice: number;
+  // Admin-created products only — a seller submits sellerPrice instead
+  // (see ProductPayload) and never sees/sets this.
+  costPrice?: number;
   sellingPrice: number;
+  // What the seller is actually paid, distinct from the buyer-facing
+  // finalPrice — see backend's models/Product.js#computeDerivedFields.
+  sellerPrice?: number;
   discountPercent: number;
   finalPrice: number;
   variants: ProductVariant[];
@@ -78,14 +83,13 @@ export interface ProductPayload {
   brand: string;
   category: string;
   subcategory: string;
-  costPrice: number;
   sellingPrice: number;
+  sellerPrice: number;
   description?: string;
   group?: string[];
   gender?: ProductGender;
   tags?: string[];
   productCollection?: string;
-  discountPercent?: number;
   variants?: ProductVariant[];
   color?: string;
   season?: string;

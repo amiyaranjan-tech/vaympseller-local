@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { useMutation } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Check, ChevronLeft, ChevronRight, Info, Plus, Trash2, X } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Info, Plus, Trash2, X } from 'lucide-react-native';
 
 import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
@@ -15,7 +15,7 @@ import { useThemeColors } from '../../../store/themeStore';
 import { useToast } from '../../../components/feedback/Toast';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
-import { ROUTES, type MainStackParamList } from '../../../navigation/routeConfig';
+import type { MainStackParamList } from '../../../navigation/routeConfig';
 import { createProduct, type ProductGender, type ProductPayload, type ProductVariant } from '../products.api';
 import {
   BRAND_OPTIONS,
@@ -24,6 +24,7 @@ import {
   SUBCATEGORY_OPTIONS,
   COLOR_OPTIONS,
   SEASON_OPTIONS,
+  SIZE_OPTIONS,
 } from '../productOptions';
 
 // Mirrors the admin panel's own product wizard (src/pages/products/
@@ -45,6 +46,64 @@ interface VariantRow {
 
 const emptyVariant = (): VariantRow => ({ size: '', color: '', sku: '', stock: '' });
 
+// Compact size picker for a variant row — same "pick from a list, don't
+// type it" behavior as the admin panel's per-row size Combobox
+// (ProductForm.tsx), just without its "create a new size" affordance
+// (that's an admin-only taxonomy-management action, not a seller one).
+function VariantSizePicker({
+  value,
+  options,
+  onSelect,
+  colors,
+}: {
+  value: string;
+  options: string[];
+  onSelect: (value: string) => void;
+  colors: ReturnType<typeof useThemeColors>['colors'];
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={[
+          styles.variantSizeInput,
+          styles.variantSizePicker,
+          { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+        ]}
+      >
+        <Text
+          style={[styles.variantSizeValue, { color: value ? colors.textPrimary : colors.inputPlaceholder }]}
+          numberOfLines={1}
+        >
+          {value || 'Size'}
+        </Text>
+        <ChevronDown size={16} color={colors.textLight} />
+      </Pressable>
+
+      <BottomSheet visible={open} onClose={() => setOpen(false)}>
+        <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Size</Text>
+        <ScrollView style={styles.sizeSheetList}>
+          {options.map(option => (
+            <Pressable
+              key={option}
+              onPress={() => {
+                onSelect(option);
+                setOpen(false);
+              }}
+              style={styles.sizeSheetRow}
+            >
+              <Text style={[styles.sizeSheetRowLabel, { color: colors.textPrimary }]}>{option}</Text>
+              {value === option && <Check size={18} color={colors.accent} />}
+            </Pressable>
+          ))}
+        </ScrollView>
+      </BottomSheet>
+    </>
+  );
+}
+
 export function AddProductScreen() {
   const { colors } = useThemeColors();
   const navigation = useNavigation<AddProductNav>();
@@ -61,10 +120,14 @@ export function AddProductScreen() {
   const [subcategory, setSubcategory] = useState('');
   const [tags, setTags] = useState('');
 
-  // Pricing
-  const [sellingPrice, setSellingPrice] = useState('999');
-  const [costPrice, setCostPrice] = useState('500');
-  const [discountPercent, setDiscountPercent] = useState('0');
+  // Pricing — Total Price is the pre-discount (MRP-style) price, struck
+  // through for buyers; Discounted Price is what the seller actually gets
+  // paid. The buyer-facing discount %/final price are computed server-side
+  // from these two (see backend's models/Product.js#computeDerivedFields),
+  // not shown live here since that also depends on an admin-configured
+  // margin setting this screen has no visibility into.
+  const [sellingPrice, setSellingPrice] = useState('2000');
+  const [sellerPrice, setSellerPrice] = useState('900');
 
   // Inventory
   const [variants, setVariants] = useState<VariantRow[]>([emptyVariant()]);
@@ -82,9 +145,8 @@ export function AddProductScreen() {
   const [isTrending, setIsTrending] = useState(false);
   const [isNewArrival, setIsNewArrival] = useState(false);
   const [isLimitedStock, setIsLimitedStock] = useState(false);
-  const [isBogo, setIsBogo] = useState(false);
   const [isReturnable, setIsReturnable] = useState(true);
-  const [tryAndBuy, setTryAndBuy] = useState(false);
+  const [tryAndBuy, setTryAndBuy] = useState(true);
 
   // Media
   const [images, setImages] = useState<PickerImage[]>([]);
@@ -92,10 +154,12 @@ export function AddProductScreen() {
 
   const [errors, setErrors] = useState<Record<string, boolean>>({});
 
-  const finalPrice = Math.max(
-    0,
-    Math.floor((Number(sellingPrice) || 0) * (1 - (Number(discountPercent) || 0) / 100)),
-  );
+  const yourDiscountPercent = (() => {
+    const total = Number(sellingPrice) || 0;
+    const seller = Number(sellerPrice) || 0;
+    if (total <= 0) return 0;
+    return Math.max(0, Math.round(((total - seller) / total) * 100));
+  })();
 
   const createMutation = useMutation({
     mutationFn: (payload: ProductPayload) => createProduct(payload),
@@ -130,7 +194,8 @@ export function AddProductScreen() {
       nextErrors.subcategory = !subcategory;
     } else if (index === 1) {
       nextErrors.sellingPrice = !sellingPrice.trim();
-      nextErrors.costPrice = !costPrice.trim();
+      nextErrors.sellerPrice =
+        !sellerPrice.trim() || Number(sellerPrice) > Number(sellingPrice || 0);
     } else if (index === 2) {
       nextErrors.variants = variants.length === 0 || variants.some(v => !v.size.trim());
     }
@@ -155,7 +220,15 @@ export function AddProductScreen() {
     }
   };
 
-  const addVariant = () => setVariants(prev => [...prev, emptyVariant()]);
+  // Matches the admin panel's own addVariant — defaults the new row to
+  // the first size not already used by another row, same as ProductForm.tsx.
+  const addVariant = () =>
+    setVariants(prev => {
+      const nextSize = SIZE_OPTIONS.find(
+        option => !prev.some(v => v.size.toLowerCase() === option.toLowerCase()),
+      );
+      return [...prev, { ...emptyVariant(), size: nextSize ?? '' }];
+    });
   const removeVariant = (index: number) =>
     setVariants(prev => prev.filter((_, i) => i !== index));
   const updateVariant = (index: number, patch: Partial<VariantRow>) =>
@@ -201,8 +274,7 @@ export function AddProductScreen() {
       subcategory,
       tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       sellingPrice: Number(sellingPrice) || 0,
-      costPrice: Number(costPrice) || 0,
-      discountPercent: Number(discountPercent) || 0,
+      sellerPrice: Number(sellerPrice) || 0,
       variants: payloadVariants,
       color,
       season,
@@ -211,7 +283,6 @@ export function AddProductScreen() {
       isTrending,
       isNewArrival,
       isLimitedStock,
-      isBogo,
       isReturnable,
       tryAndBuy,
       images,
@@ -380,28 +451,26 @@ export function AddProductScreen() {
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Pricing</Text>
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <FieldLabel label="Selling Price" required colors={colors} />
+                  <FieldLabel label="Total Price" required colors={colors} />
                   <CountedInput value={sellingPrice} onChangeText={setSellingPrice} placeholder="0" maxLength={10} keyboardType="number-pad" colors={colors} />
                 </View>
                 <View style={styles.col}>
-                  <FieldLabel label="Cost Price" required colors={colors} />
-                  <CountedInput value={costPrice} onChangeText={setCostPrice} placeholder="0" maxLength={10} keyboardType="number-pad" colors={colors} />
+                  <FieldLabel label="Discounted Price" required colors={colors} />
+                  <CountedInput value={sellerPrice} onChangeText={setSellerPrice} placeholder="0" maxLength={10} keyboardType="number-pad" colors={colors} />
                 </View>
               </View>
-              {(errors.sellingPrice || errors.costPrice) && (
+              {(errors.sellingPrice || errors.sellerPrice) && (
                 <Text style={[styles.errorText, { color: colors.error }]}>
-                  Selling price and cost price are required
+                  Enter both prices — Discounted Price can't be more than Total Price
                 </Text>
               )}
-              <FieldLabel label="Discount %" colors={colors} />
-              <CountedInput value={discountPercent} onChangeText={setDiscountPercent} placeholder="0" maxLength={3} keyboardType="number-pad" colors={colors} />
 
               <View style={[styles.finalPriceRow, { backgroundColor: colors.grey100 }]}>
                 <Text style={[styles.finalPriceLabel, { color: colors.textSecondary }]}>
-                  Final price after discount
+                  You get paid
                 </Text>
                 <Text style={[styles.finalPriceValue, { color: colors.textPrimary }]}>
-                  ₹{finalPrice.toLocaleString('en-IN')}
+                  ₹{(Number(sellerPrice) || 0).toLocaleString('en-IN')} ({yourDiscountPercent}% off)
                 </Text>
               </View>
             </>
@@ -412,15 +481,11 @@ export function AddProductScreen() {
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Variants (size, stock)</Text>
               {variants.map((variant, index) => (
                 <View key={index} style={styles.variantRow}>
-                  <TextInput
+                  <VariantSizePicker
                     value={variant.size}
-                    onChangeText={text => updateVariant(index, { size: text })}
-                    placeholder="Size"
-                    placeholderTextColor={colors.inputPlaceholder}
-                    style={[
-                      styles.variantSizeInput,
-                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary },
-                    ]}
+                    options={SIZE_OPTIONS}
+                    onSelect={size => updateVariant(index, { size })}
+                    colors={colors}
                   />
                   <TextInput
                     value={variant.stock}
@@ -492,7 +557,6 @@ export function AddProductScreen() {
               <FlagCheckbox title="Trending" description="Show in trending collections" checked={isTrending} onToggle={() => setIsTrending(v => !v)} colors={colors} />
               <FlagCheckbox title="New Arrival" description="Show in the new arrivals shelf" checked={isNewArrival} onToggle={() => setIsNewArrival(v => !v)} colors={colors} />
               <FlagCheckbox title="Limited Stock" description="Show a limited-stock urgency badge" checked={isLimitedStock} onToggle={() => setIsLimitedStock(v => !v)} colors={colors} />
-              <FlagCheckbox title="Buy One Get One" description="Marks this product as BOGO-eligible" checked={isBogo} onToggle={() => setIsBogo(v => !v)} colors={colors} />
 
               <View style={[styles.divider, { backgroundColor: colors.divider }]} />
 
@@ -515,6 +579,11 @@ export function AddProductScreen() {
                 onToggle={() => setTryAndBuy(v => !v)}
                 colors={colors}
               />
+              {!isReturnable && (
+                <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+                  Non-returnable products aren't eligible for Try & Buy.
+                </Text>
+              )}
 
               <View style={[styles.infoBanner, { backgroundColor: colors.info10 }]}>
                 <Info size={16} color={colors.info} />
@@ -677,6 +746,11 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     fontSize: FontSize.xs,
   },
+  helperText: {
+    marginTop: -Spacing.xs,
+    marginBottom: Spacing.sm,
+    fontSize: FontSize.xs,
+  },
   sheetTitle: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
@@ -720,6 +794,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
+    fontSize: FontSize.md,
+  },
+  variantSizePicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  variantSizeValue: {
+    flex: 1,
+    fontSize: FontSize.md,
+    marginRight: Spacing.xs,
+  },
+  sizeSheetList: {
+    maxHeight: 360,
+  },
+  sizeSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.md,
+  },
+  sizeSheetRowLabel: {
     fontSize: FontSize.md,
   },
   variantStockInput: {

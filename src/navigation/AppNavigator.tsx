@@ -25,6 +25,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 // just belt-and-suspenders for any stale nested-stack state.
 export function AppNavigator() {
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const hasHydrated = useAuthStore(state => state.hasHydrated);
   const { isAccountActive } = useSellerAccess();
 
   // Was built for exactly this ("status may have changed server-side...
@@ -35,6 +36,17 @@ export function AppNavigator() {
   // fresh launch; AccountStatusScreen also exposes a manual refresh for
   // someone sitting on that screen without relaunching.
   useMe();
+
+  // Before the persisted auth state has actually been read back from
+  // AsyncStorage, isAuthenticated is still its in-memory `false` default
+  // — rendering the switch below on that would flash Login/Register for
+  // an already-logged-in (or pending-verification) seller before the real
+  // value arrives a moment later. Render nothing until it has (no splash
+  // library in this app — the native launch screen still covers this
+  // brief a gap).
+  if (!hasHydrated) {
+    return null;
+  }
 
   return (
     <NavigationContainer ref={navigationRef}>

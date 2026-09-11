@@ -31,7 +31,6 @@ import {
 
 import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
-import { Badge, type BadgeTone } from '../../../components/common/Badge';
 import { ImageCarousel } from '../../../components/common/ImageCarousel';
 import { Skeleton } from '../../../components/feedback/Skeleton';
 import { useToast } from '../../../components/feedback/Toast';
@@ -47,7 +46,6 @@ const PRODUCT_FILTERS = [
   'All',
   'Draft',
   'Pending',
-  'Approved',
   'Published',
   'Hidden',
   'Archived',
@@ -59,11 +57,15 @@ type ProductFilter = (typeof PRODUCT_FILTERS)[number];
 // has no dealType filter param (see services/sellerProduct.service.js#
 // getAll), so it fetches unfiltered (same as All) and gets narrowed to
 // dealType !== 'none' client-side below instead.
+//
+// No separate "Approved" tab — admin's Approve & Publish is one action
+// now (see the admin panel's ProductApprovals.tsx), so "approved" is a
+// transient status a seller's own product list should never realistically
+// catch a product sitting in; Published covers what used to be two tabs.
 const FILTER_STATUS: Record<ProductFilter, ProductStatus | undefined> = {
   All: undefined,
   Draft: 'draft',
   Pending: 'pending_review',
-  Approved: 'approved',
   Published: 'published',
   Hidden: 'hidden',
   Archived: 'archived',
@@ -78,16 +80,6 @@ const STATUS_LABEL: Record<ProductStatus, string> = {
   rejected: 'Rejected',
   hidden: 'Hidden',
   archived: 'Archived',
-};
-
-const STATUS_TONE: Record<ProductStatus, BadgeTone> = {
-  draft: 'neutral',
-  pending_review: 'warning',
-  approved: 'info',
-  published: 'success',
-  rejected: 'error',
-  hidden: 'neutral',
-  archived: 'neutral',
 };
 
 const TIPS = [
@@ -172,7 +164,7 @@ function ProductCard({
           }
         />
         <View style={styles.productImageBadge}>
-          <Badge label={STATUS_LABEL[product.status]} tone={STATUS_TONE[product.status]} />
+          <Text style={styles.productImageBadgeLabel}>{STATUS_LABEL[product.status]}</Text>
         </View>
 
         {dealBadge && (
@@ -637,10 +629,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // A fixed dark scrim, not the shared Badge component's usual
+  // translucent (10%-opacity) tone tint, and not a solid per-status tone
+  // color either — over an arbitrary product photo a 10%-opacity chip is
+  // nearly invisible, and per-tone solid colors don't work either (the
+  // dark theme's "warning"/"neutral" tones are light colors that white
+  // text reads poorly against, while the light theme's are dark). A
+  // fixed dark scrim + white text is legible over any photo in either
+  // theme, full stop — same idea as dealBadge below, just theme-neutral.
   productImageBadge: {
     position: 'absolute',
     top: Spacing.sm,
     left: Spacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+  },
+  productImageBadgeLabel: {
+    color: '#FFFFFF',
+    fontSize: FontSize.xxxs,
+    fontWeight: FontWeight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   dealBadge: {
     position: 'absolute',

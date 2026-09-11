@@ -1,5 +1,7 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -25,11 +27,12 @@ import {
 import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
+import { StepProgressBar } from '../../../components/common/StepProgressBar';
 import { FormTextInput } from '../../../components/forms/FormTextInput';
 import { useToast } from '../../../components/feedback/Toast';
 import { useThemeColors } from '../../../store/themeStore';
 import { Spacing, Radius } from '../../../theme/spacing';
-import { FontSize, FontWeight } from '../../../theme/typography';
+import { FontSize, FontWeight, LineHeight } from '../../../theme/typography';
 import { registerSchema, type RegisterFormValues } from '../schemas';
 import { useRegister } from '../hooks/useAuthMutations';
 import { ROUTES, type AuthStackParamList } from '../../../navigation/routeConfig';
@@ -38,12 +41,26 @@ import { ApiError } from '../../../types/api';
 type Colors = ReturnType<typeof useThemeColors>['colors'];
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
+const TOTAL_STEPS = 3;
+
+// Which fields belong to each step — validated (via RHF's trigger) before
+// letting the customer move to the next one, same "don't let a step 1
+// mistake surface as a step 3 error" reasoning a real multi-step form
+// needs. 'bank' triggers its whole nested subtree in one go.
+const STEP_FIELDS: (keyof RegisterFormValues)[][] = [
+  ['shopName', 'ownerName', 'email', 'phone', 'password', 'confirmPassword'],
+  ['address', 'city', 'state', 'postalCode'],
+  ['gstNumber', 'businessRegistration', 'bank'],
+];
+
 function SectionHeader({
+  index,
   icon,
   title,
   description,
   colors,
 }: {
+  index: number;
   icon: React.ReactNode;
   title: string;
   description: string;
@@ -51,9 +68,14 @@ function SectionHeader({
 }) {
   return (
     <View style={styles.sectionHeader}>
-      <View style={[styles.sectionIcon, { backgroundColor: colors.accent10 }]}>{icon}</View>
+      <View style={[styles.sectionBadge, { backgroundColor: colors.accent }]}>
+        <Text style={[styles.sectionBadgeText, { color: colors.textInverse }]}>{index}</Text>
+      </View>
       <View style={styles.sectionHeaderText}>
-        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{title}</Text>
+        <View style={styles.sectionTitleRow}>
+          {icon}
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{title}</Text>
+        </View>
         <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
           {description}
         </Text>
@@ -64,10 +86,12 @@ function SectionHeader({
 
 export function RegisterScreen({ navigation }: Props) {
   const { colors } = useThemeColors();
+  const insets = useSafeAreaInsets();
   const toast = useToast();
   const register = useRegister();
+  const [step, setStep] = React.useState(0);
 
-  const { control, handleSubmit } = useForm<RegisterFormValues>({
+  const { control, handleSubmit, trigger } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       shopName: '',
@@ -98,193 +122,204 @@ export function RegisterScreen({ navigation }: Props) {
     });
   });
 
+  const goNext = async () => {
+    const valid = await trigger(STEP_FIELDS[step]);
+    if (valid) setStep(current => current + 1);
+  };
+
+  const goBack = () => {
+    if (step === 0) {
+      navigation.goBack();
+      return;
+    }
+    setStep(current => current - 1);
+  };
+
   const iconColor = colors.accent;
+  const isLastStep = step === TOTAL_STEPS - 1;
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={[styles.backButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-        >
-          <ChevronLeft size={22} color={colors.textPrimary} />
-        </Pressable>
+      <KeyboardAwareScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.content, styles.contentWithFixedBar]}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid
+        extraScrollHeight={Spacing.xxl}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.topRow}>
+          <Pressable
+            onPress={goBack}
+            hitSlop={12}
+            style={[styles.backButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <ChevronLeft size={22} color={colors.textPrimary} />
+          </Pressable>
 
-        <Text style={[styles.title, { color: colors.textPrimary }]}>Create shop account</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Fill in the details to get started with Vaymp
-        </Text>
+          <StepProgressBar step={step} total={TOTAL_STEPS} />
+        </View>
 
-        <Card style={styles.card}>
-          <SectionHeader
-            icon={<Store size={20} color={iconColor} />}
-            title="Shop details"
-            description="Basic information about your shop"
-            colors={colors}
-          />
-          <View style={styles.row}>
-            <View style={styles.col}>
-              <FormTextInput
-                control={control}
-                name="shopName"
-                label="Shop name"
-                required
-                placeholder="Enter shop name"
-                leftIcon={<Store size={18} color={colors.textLight} />}
-              />
-            </View>
-            <View style={styles.col}>
-              <FormTextInput
-                control={control}
-                name="ownerName"
-                label="Owner name"
-                required
-                placeholder="Enter owner name"
-                leftIcon={<User size={18} color={colors.textLight} />}
-              />
-            </View>
-          </View>
-          <View style={styles.row}>
-            <View style={styles.col}>
-              <FormTextInput
-                control={control}
-                name="email"
-                label="Email"
-                required
-                placeholder="Enter email address"
-                autoCapitalize="none"
-                keyboardType="email-address"
-                leftIcon={<Mail size={18} color={colors.textLight} />}
-              />
-            </View>
-            <View style={styles.col}>
-              <FormTextInput
-                control={control}
-                name="phone"
-                label="Phone number"
-                required
-                placeholder="Enter phone number"
-                keyboardType="phone-pad"
-                leftIcon={<Phone size={18} color={colors.textLight} />}
-              />
-            </View>
-          </View>
-          <View style={styles.row}>
-            <View style={styles.col}>
-              <FormTextInput
-                control={control}
-                name="password"
-                label="Password"
-                required
-                placeholder="Enter password"
-                secureTextEntry
-                leftIcon={<Lock size={18} color={colors.textLight} />}
-              />
-            </View>
-            <View style={styles.col}>
-              <FormTextInput
-                control={control}
-                name="confirmPassword"
-                label="Confirm password"
-                required
-                placeholder="Confirm password"
-                secureTextEntry
-                leftIcon={<Lock size={18} color={colors.textLight} />}
-              />
-            </View>
-          </View>
-        </Card>
+        {step === 0 && (
+          <>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>
+              Create your{'\n'}
+              <Text style={{ color: colors.accent }}>shop account</Text>
+            </Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              Start selling with Vaymp. It only takes a few minutes.
+            </Text>
+          </>
+        )}
 
-        <Card style={styles.card}>
-          <SectionHeader
-            icon={<MapPin size={20} color={iconColor} />}
-            title="Address"
-            description="Your business address"
-            colors={colors}
-          />
-          <FormTextInput
-            control={control}
-            name="address"
-            label="Address"
-            required
-            placeholder="Enter full address"
-            leftIcon={<MapPin size={18} color={colors.textLight} />}
-          />
-          <View style={styles.row}>
-            <View style={styles.col}>
-              <FormTextInput
-                control={control}
-                name="city"
-                label="City"
-                required
-                placeholder="Enter city"
-                leftIcon={<Building2 size={18} color={colors.textLight} />}
-              />
-            </View>
-            <View style={styles.col}>
-              <FormTextInput
-                control={control}
-                name="state"
-                label="State"
-                required
-                placeholder="Enter state"
-                leftIcon={<Map size={18} color={colors.textLight} />}
-              />
-            </View>
-            <View style={styles.col}>
-              <FormTextInput
-                control={control}
-                name="postalCode"
-                label="Postal code"
-                required
-                placeholder="Enter postal code"
-                keyboardType="number-pad"
-                leftIcon={<Hash size={18} color={colors.textLight} />}
-              />
-            </View>
-          </View>
-        </Card>
+        {step === 0 && (
+          <Card style={styles.card}>
+            <SectionHeader
+              index={1}
+              icon={<Store size={18} color={iconColor} style={styles.sectionIcon} />}
+              title="Shop details"
+              description="Basic information about your shop"
+              colors={colors}
+            />
+            <FormTextInput
+              control={control}
+              name="shopName"
+              label="Shop name"
+              required
+              placeholder="Enter shop name"
+              leftIcon={<Store size={18} color={colors.textLight} />}
+            />
+            <FormTextInput
+              control={control}
+              name="ownerName"
+              label="Owner name"
+              required
+              placeholder="Enter owner name"
+              leftIcon={<User size={18} color={colors.textLight} />}
+            />
+            <FormTextInput
+              control={control}
+              name="email"
+              label="Email"
+              required
+              placeholder="Enter email address"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              leftIcon={<Mail size={18} color={colors.textLight} />}
+            />
+            <FormTextInput
+              control={control}
+              name="phone"
+              label="Phone number"
+              required
+              placeholder="Enter phone number"
+              keyboardType="phone-pad"
+              leftIcon={<Phone size={18} color={colors.textLight} />}
+            />
+            <FormTextInput
+              control={control}
+              name="password"
+              label="Password"
+              required
+              placeholder="Enter password"
+              secureTextEntry
+              leftIcon={<Lock size={18} color={colors.textLight} />}
+            />
+            <FormTextInput
+              control={control}
+              name="confirmPassword"
+              label="Confirm password"
+              required
+              placeholder="Confirm password"
+              secureTextEntry
+              leftIcon={<Lock size={18} color={colors.textLight} />}
+            />
+          </Card>
+        )}
 
-        <Card style={styles.card}>
-          <SectionHeader
-            icon={<FileText size={20} color={iconColor} />}
-            title="Business information"
-            description="Tax and business registration details"
-            colors={colors}
-          />
-          <View style={styles.row}>
-            <View style={styles.col}>
+        {step === 1 && (
+          <Card style={styles.card}>
+            <SectionHeader
+              index={2}
+              icon={<MapPin size={18} color={iconColor} style={styles.sectionIcon} />}
+              title="Address"
+              description="Your business address"
+              colors={colors}
+            />
+            <FormTextInput
+              control={control}
+              name="address"
+              label="Address"
+              required
+              placeholder="Enter full address"
+              leftIcon={<MapPin size={18} color={colors.textLight} />}
+            />
+            <FormTextInput
+              control={control}
+              name="city"
+              label="City"
+              required
+              placeholder="Enter city"
+              leftIcon={<Building2 size={18} color={colors.textLight} />}
+            />
+            <FormTextInput
+              control={control}
+              name="state"
+              label="State"
+              required
+              placeholder="Enter state"
+              leftIcon={<Map size={18} color={colors.textLight} />}
+            />
+            <FormTextInput
+              control={control}
+              name="postalCode"
+              label="Postal code"
+              required
+              placeholder="Enter postal code"
+              keyboardType="number-pad"
+              leftIcon={<Hash size={18} color={colors.textLight} />}
+            />
+          </Card>
+        )}
+
+        {isLastStep && (
+          <>
+            <Card style={styles.card}>
+              <SectionHeader
+                index={3}
+                icon={<FileText size={18} color={iconColor} style={styles.sectionIcon} />}
+                title="Business information"
+                description="Tax and business registration details"
+                colors={colors}
+              />
               <FormTextInput
                 control={control}
                 name="gstNumber"
                 label="GST number"
-                placeholder="Enter GST number (optional)"
+                required
+                placeholder="Enter GST number"
                 autoCapitalize="characters"
+                maxLength={15}
                 leftIcon={<Percent size={18} color={colors.textLight} />}
               />
-            </View>
-            <View style={styles.col}>
               <FormTextInput
                 control={control}
                 name="businessRegistration"
                 label="Business registration number"
-                placeholder="Enter registration number (optional)"
+                required
+                placeholder="Enter registration number"
                 leftIcon={<FileText size={18} color={colors.textLight} />}
               />
-            </View>
-          </View>
-        </Card>
+            </Card>
 
-        <Card style={styles.card}>
-          <SectionHeader
-            icon={<Landmark size={20} color={iconColor} />}
-            title="Bank details"
-            description="Add your bank account for secure payouts"
-            colors={colors}
-          />
-          <View style={styles.row}>
-            <View style={styles.col}>
+            <Card style={styles.card}>
+              <SectionHeader
+                index={4}
+                icon={<Landmark size={18} color={iconColor} style={styles.sectionIcon} />}
+                title="Bank details"
+                description="Add your bank account for secure payouts"
+                colors={colors}
+              />
               <FormTextInput
                 control={control}
                 name="bank.accountName"
@@ -293,8 +328,6 @@ export function RegisterScreen({ navigation }: Props) {
                 placeholder="Enter account holder name"
                 leftIcon={<User size={18} color={colors.textLight} />}
               />
-            </View>
-            <View style={styles.col}>
               <FormTextInput
                 control={control}
                 name="bank.accountNumber"
@@ -304,10 +337,6 @@ export function RegisterScreen({ navigation }: Props) {
                 keyboardType="number-pad"
                 leftIcon={<CreditCard size={18} color={colors.textLight} />}
               />
-            </View>
-          </View>
-          <View style={styles.row}>
-            <View style={styles.col}>
               <FormTextInput
                 control={control}
                 name="bank.ifsc"
@@ -317,8 +346,6 @@ export function RegisterScreen({ navigation }: Props) {
                 autoCapitalize="characters"
                 leftIcon={<ShieldCheck size={18} color={colors.textLight} />}
               />
-            </View>
-            <View style={styles.col}>
               <FormTextInput
                 control={control}
                 name="bank.bankName"
@@ -327,50 +354,91 @@ export function RegisterScreen({ navigation }: Props) {
                 placeholder="Enter bank name"
                 leftIcon={<Landmark size={18} color={colors.textLight} />}
               />
+            </Card>
+
+            <View style={[styles.safeBanner, { backgroundColor: colors.accent10 }]}>
+              <View style={[styles.safeIcon, { backgroundColor: colors.accent }]}>
+                <ShieldCheck size={20} color={colors.textInverse} />
+              </View>
+              <View style={styles.safeText}>
+                <Text style={[styles.safeTitle, { color: colors.textPrimary }]}>
+                  Your data is safe with us
+                </Text>
+                <Text style={[styles.safeDescription, { color: colors.textSecondary }]}>
+                  We use industry standard security to protect your information.
+                </Text>
+              </View>
             </View>
-          </View>
-        </Card>
 
-        <View style={[styles.safeBanner, { backgroundColor: colors.accent10 }]}>
-          <View style={[styles.safeIcon, { backgroundColor: colors.accent }]}>
-            <ShieldCheck size={20} color={colors.textInverse} />
-          </View>
-          <View style={styles.safeText}>
-            <Text style={[styles.safeTitle, { color: colors.textPrimary }]}>
-              Your data is safe with us
-            </Text>
-            <Text style={[styles.safeDescription, { color: colors.textSecondary }]}>
-              We use industry standard security to protect your information.
-            </Text>
-          </View>
-        </View>
+            <View style={styles.footer}>
+              <Text style={{ color: colors.textSecondary }}>Already have an account? </Text>
+              <Text
+                style={{ color: colors.textLink, fontWeight: FontWeight.semibold }}
+                onPress={() => navigation.navigate(ROUTES.LOGIN)}
+              >
+                Login
+              </Text>
+            </View>
+          </>
+        )}
 
-        <Button
-          label="Create account"
-          onPress={onSubmit}
-          loading={register.isPending}
-          style={styles.submit}
-          rightIcon={<ArrowRight size={18} color={colors.buttonPrimaryText} />}
-        />
+      </KeyboardAwareScrollView>
 
-        <View style={styles.footer}>
-          <Text style={{ color: colors.textSecondary }}>Already have an account? </Text>
-          <Text
-            style={{ color: colors.textLink, fontWeight: FontWeight.semibold }}
-            onPress={() => navigation.navigate(ROUTES.LOGIN)}
-          >
-            Login
-          </Text>
-        </View>
-      </ScrollView>
+      <View
+        style={[
+          styles.bottomBar,
+          {
+            backgroundColor: colors.background,
+            borderTopColor: colors.border,
+            paddingBottom: insets.bottom + Spacing.md,
+          },
+        ]}
+      >
+        {isLastStep ? (
+          <Button
+            label="Create account"
+            onPress={onSubmit}
+            loading={register.isPending}
+            rightIcon={<ArrowRight size={18} color={colors.buttonPrimaryText} />}
+          />
+        ) : (
+          <Button
+            label="Continue"
+            onPress={() => void goNext()}
+            rightIcon={<ArrowRight size={18} color={colors.buttonPrimaryText} />}
+          />
+        )}
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+  },
   content: {
     padding: Spacing.lg,
     paddingBottom: Spacing.xxxl,
+  },
+  contentWithFixedBar: {
+    // Room for the fixed Continue bar below so the last field isn't
+    // hidden behind it.
+    paddingBottom: Spacing.giant + Spacing.xxxl,
+  },
+  bottomBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
   backButton: {
     width: 40,
@@ -383,11 +451,13 @@ const styles = StyleSheet.create({
   title: {
     marginTop: Spacing.lg,
     fontSize: FontSize.xxxl,
+    lineHeight: LineHeight.xxxl,
     fontWeight: FontWeight.bold,
   },
   subtitle: {
-    marginTop: Spacing.xxs,
+    marginTop: Spacing.sm,
     fontSize: FontSize.sm,
+    lineHeight: LineHeight.sm,
   },
   card: {
     marginTop: Spacing.lg,
@@ -397,16 +467,28 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: Spacing.lg,
   },
-  sectionIcon: {
-    width: 40,
-    height: 40,
+  sectionBadge: {
+    width: 32,
+    height: 32,
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: Spacing.md,
   },
+  sectionBadgeText: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+  },
   sectionHeaderText: {
     flex: 1,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  sectionIcon: {
+    marginRight: 2,
   },
   sectionTitle: {
     fontSize: FontSize.lg,
@@ -415,13 +497,6 @@ const styles = StyleSheet.create({
   sectionDescription: {
     marginTop: 1,
     fontSize: FontSize.xs,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  col: {
-    flex: 1,
   },
   safeBanner: {
     marginTop: Spacing.lg,
@@ -448,9 +523,6 @@ const styles = StyleSheet.create({
   safeDescription: {
     marginTop: 1,
     fontSize: FontSize.xs,
-  },
-  submit: {
-    marginTop: Spacing.xl,
   },
   footer: {
     flexDirection: 'row',

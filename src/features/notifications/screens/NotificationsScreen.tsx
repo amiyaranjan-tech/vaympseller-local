@@ -18,6 +18,7 @@ import {
   markNotificationRead,
 } from '../notifications.api';
 import { GROUPS, TYPE_META, type Group, NotificationRow } from '../notificationDisplay';
+import { navigateFromNotification } from '../notificationNavigation';
 
 type Nav = NativeStackNavigationProp<MainStackParamList, 'Notifications'>;
 
@@ -172,6 +173,7 @@ export function NotificationsScreen() {
               colors={colors}
               onPress={() => {
                 if (!item.isRead) markReadMutation.mutate(item._id);
+                navigateFromNotification(item, navigation);
               }}
             />
           ))

@@ -9,3 +9,32 @@ export const CATEGORY_OPTIONS = ['Topwear', 'Bottomwear', 'Ethnic Wear', 'Footwe
 export const SUBCATEGORY_OPTIONS = ['Shirts', 'T-Shirts', 'Jeans', 'Trousers', 'Sarees', 'Sneakers'];
 export const COLOR_OPTIONS = ['Black', 'White', 'Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Multicolor'];
 export const SEASON_OPTIONS = ['Summer', 'Winter', 'Monsoon', 'All Season'];
+
+// Mirrors the shape of the admin panel's per-subcategory size picker
+// (src/pages/products/ProductForm.tsx's sizeOptions), just flattened —
+// there's no real subcategory taxonomy wired up here yet (see above), so
+// this is one shared list rather than scoped per subcategory.
+export const SIZE_OPTIONS = [
+  'XS',
+  'S',
+  'M',
+  'L',
+  'XL',
+  'XXL',
+  'XXXL',
+  'Free Size',
+  '28',
+  '30',
+  '32',
+  '34',
+  '36',
+  '38',
+  '40',
+  '42',
+  '6',
+  '7',
+  '8',
+  '9',
+  '10',
+  '11',
+];
