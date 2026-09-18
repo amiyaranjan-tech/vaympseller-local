@@ -3,6 +3,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } fro
 import { launchImageLibrary } from 'react-native-image-picker';
 import { Plus, X } from 'lucide-react-native';
 
+import { uploadSellerImage } from '../../api/uploads.api';
 import { useThemeColors } from '../../store/themeStore';
 import { useToast } from '../feedback/Toast';
 import { Spacing, Radius } from '../../theme/spacing';
@@ -21,16 +22,6 @@ interface ProductImagePickerProps {
 
 const TILE = 84;
 
-// ponytail: no Cloudinary for now — the picked photo is base64-encoded
-// on-device into a `data:` URI and stored directly in the product's own
-// `images[].url` (Mongo document, no separate upload/CDN step). Simple
-// and always works, but every image now lives inline in the product
-// document: MongoDB caps a document at 16MB, and Express's JSON body
-// limit here is 10mb (server.js), so this doesn't scale to many/large
-// photos. maxWidth/maxHeight below keeps each photo small enough that a
-// handful comfortably fit either limit. Swap back to real Cloudinary
-// upload (see git history for utils/cloudinaryUpload.ts) once that
-// matters.
 export function ProductImagePicker({ images, onChange, max = 6 }: ProductImagePickerProps) {
   const { colors } = useThemeColors();
   const toast = useToast();
@@ -43,28 +34,27 @@ export function ProductImagePicker({ images, onChange, max = 6 }: ProductImagePi
       mediaType: 'photo',
       quality: 0.8,
       selectionLimit: 1,
-      includeBase64: true,
       maxWidth: 1280,
       maxHeight: 1280,
     });
     if (result.didCancel) return;
 
     const asset = result.assets?.[0];
-    if (!asset?.base64) {
+    if (!asset?.uri) {
       toast.show({ type: 'error', title: "Couldn't read that image" });
       return;
     }
 
     setProcessing(true);
     try {
-      const mimeType = asset.type ?? 'image/jpeg';
-      onChange([
-        ...images,
-        {
-          url: `data:${mimeType};base64,${asset.base64}`,
-          publicId: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        },
-      ]);
+      const uploaded = await uploadSellerImage({
+        uri: asset.uri,
+        type: asset.type ?? 'image/jpeg',
+        name: asset.fileName ?? `photo-${Date.now()}.jpg`,
+      });
+      onChange([...images, uploaded]);
+    } catch {
+      toast.show({ type: 'error', title: 'Image upload failed' });
     } finally {
       setProcessing(false);
     }

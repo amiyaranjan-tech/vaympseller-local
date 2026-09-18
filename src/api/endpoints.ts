@@ -19,7 +19,7 @@ export const ENDPOINTS = {
     status: (id: string) => `/seller/products/${id}/status`,
   },
   sellerUploads: {
-    sign: '/seller/uploads/sign',
+    create: '/seller/uploads',
   },
   sellerOrders: {
     list: '/seller/orders',

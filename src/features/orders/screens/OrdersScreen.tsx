@@ -31,6 +31,7 @@ import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import { ROUTES, type MainStackParamList, type MainTabParamList } from '../../../navigation/routeConfig';
 import { getOrders, type Order, type OrderFulfillmentStatus } from '../orders.api';
+import { ApiError } from '../../../types/api';
 
 type Colors = ReturnType<typeof useThemeColors>['colors'];
 
@@ -221,6 +222,25 @@ export function OrdersScreen() {
             <Skeleton height={72} style={styles.skeletonBlock} />
             <Skeleton height={72} style={styles.skeletonBlock} />
           </>
+        ) : ordersQuery.isError ? (
+          <Card style={styles.emptyCard}>
+            <View style={[styles.emptyIconRing, { backgroundColor: `${colors.error}14` }]}>
+              <CircleX size={48} color={colors.error} />
+            </View>
+
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Couldn't load orders</Text>
+            <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+              {ordersQuery.error instanceof ApiError
+                ? ordersQuery.error.message
+                : 'Something went wrong. Please try again.'}
+            </Text>
+
+            <Button
+              label="Retry"
+              onPress={() => void ordersQuery.refetch()}
+              style={styles.emptyButton}
+            />
+          </Card>
         ) : orders.length === 0 ? (
           <Card style={styles.emptyCard}>
             <View style={[styles.emptyIconRing, { backgroundColor: `${colors.accent}14` }]}>
