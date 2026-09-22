@@ -21,6 +21,13 @@ export const ENDPOINTS = {
   sellerUploads: {
     create: '/seller/uploads',
   },
+  sellerTaxonomy: {
+    genders: '/seller/taxonomy/genders',
+    categories: '/seller/taxonomy/categories',
+    subcategories: '/seller/taxonomy/subcategories',
+    options: '/seller/taxonomy/options',
+    createBrand: '/seller/taxonomy/brands',
+  },
   sellerOrders: {
     list: '/seller/orders',
     detail: (id: string) => `/seller/orders/${id}`,

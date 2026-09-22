@@ -11,21 +11,14 @@ import { Button } from '../../../components/common/Button';
 import { BottomSheet } from '../../../components/common/BottomSheet';
 import { ProductImagePicker, type PickerImage } from '../../../components/common/ProductImagePicker';
 import { FieldLabel, CountedInput, SelectField, FlagCheckbox } from '../../../components/forms/ProductFormFields';
+import { BrandSelectField } from '../../../components/forms/BrandSelectField';
 import { useThemeColors } from '../../../store/themeStore';
 import { useToast } from '../../../components/feedback/Toast';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import type { MainStackParamList } from '../../../navigation/routeConfig';
 import { createProduct, type ProductGender, type ProductPayload, type ProductVariant } from '../products.api';
-import {
-  BRAND_OPTIONS,
-  GENDER_OPTIONS,
-  CATEGORY_OPTIONS,
-  SUBCATEGORY_OPTIONS,
-  COLOR_OPTIONS,
-  SEASON_OPTIONS,
-  SIZE_OPTIONS,
-} from '../productOptions';
+import { useProductTaxonomy } from '../useProductTaxonomy';
 
 // Mirrors the admin panel's own product wizard (src/pages/products/
 // ProductForm.tsx) step-for-step — Basics/Pricing/Inventory/Attributes/
@@ -154,6 +147,17 @@ export function AddProductScreen() {
 
   const [errors, setErrors] = useState<Record<string, boolean>>({});
 
+  const {
+    genderOptions,
+    categoryOptions,
+    subcategoryOptions,
+    colorOptions,
+    seasonOptions,
+    sizeOptions,
+    brandOptions,
+    refreshBrands,
+  } = useProductTaxonomy(gender.toLowerCase(), category, subcategory);
+
   const yourDiscountPercent = (() => {
     const total = Number(sellingPrice) || 0;
     const seller = Number(sellerPrice) || 0;
@@ -224,7 +228,7 @@ export function AddProductScreen() {
   // the first size not already used by another row, same as ProductForm.tsx.
   const addVariant = () =>
     setVariants(prev => {
-      const nextSize = SIZE_OPTIONS.find(
+      const nextSize = sizeOptions.find(
         option => !prev.some(v => v.size.toLowerCase() === option.toLowerCase()),
       );
       return [...prev, { ...emptyVariant(), size: nextSize ?? '' }];
@@ -385,19 +389,17 @@ export function AddProductScreen() {
                     required
                     placeholder="Select gender"
                     value={gender}
-                    options={GENDER_OPTIONS}
+                    options={genderOptions}
                     onSelect={setGenderAndReset}
                     colors={colors}
                   />
                 </View>
                 <View style={styles.col}>
-                  <SelectField
-                    label="Brand"
-                    placeholder="Select brand"
+                  <BrandSelectField
                     value={brand}
-                    options={BRAND_OPTIONS}
+                    options={brandOptions}
                     onSelect={setBrand}
-                    colors={colors}
+                    onBrandAdded={refreshBrands}
                   />
                 </View>
               </View>
@@ -408,9 +410,9 @@ export function AddProductScreen() {
                   <SelectField
                     label="Category"
                     required
-                    placeholder="Select category"
+                    placeholder={gender ? 'Select category' : 'Select gender first'}
                     value={category}
-                    options={CATEGORY_OPTIONS}
+                    options={categoryOptions}
                     onSelect={setCategoryAndReset}
                     colors={colors}
                   />
@@ -419,9 +421,9 @@ export function AddProductScreen() {
                   <SelectField
                     label="Subcategory"
                     required
-                    placeholder="Select subcategory"
+                    placeholder={category ? 'Select subcategory' : 'Select category first'}
                     value={subcategory}
-                    options={SUBCATEGORY_OPTIONS}
+                    options={subcategoryOptions}
                     onSelect={setSubcategory}
                     colors={colors}
                   />
@@ -483,7 +485,7 @@ export function AddProductScreen() {
                 <View key={index} style={styles.variantRow}>
                   <VariantSizePicker
                     value={variant.size}
-                    options={SIZE_OPTIONS}
+                    options={sizeOptions}
                     onSelect={size => updateVariant(index, { size })}
                     colors={colors}
                   />
@@ -520,10 +522,10 @@ export function AddProductScreen() {
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Attributes</Text>
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <SelectField label="Color" placeholder="Select color" value={color} options={COLOR_OPTIONS} onSelect={setColor} colors={colors} />
+                  <SelectField label="Color" placeholder="Select color" value={color} options={colorOptions} onSelect={setColor} colors={colors} />
                 </View>
                 <View style={styles.col}>
-                  <SelectField label="Season" placeholder="Select season" value={season} options={SEASON_OPTIONS} onSelect={setSeason} colors={colors} />
+                  <SelectField label="Season" placeholder="Select season" value={season} options={seasonOptions} onSelect={setSeason} colors={colors} />
                 </View>
               </View>
 
