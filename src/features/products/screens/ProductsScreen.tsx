@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Box,
@@ -302,12 +302,28 @@ export function ProductsScreen() {
   const items = filter === 'Deals' ? rawItems.filter(p => p.dealType !== 'none') : rawItems;
   const hasActiveFilter = filter !== 'All' || search.length > 0;
 
+  // The per-tab counts (filterCounts above) are their own cached queries
+  // with a 30s staleTime — a status change that happens outside this
+  // screen (admin approving/rejecting a pending product, for one) can
+  // leave a tab's badge showing a stale count indefinitely, since nothing
+  // was re-triggering a refetch. Refresh everything under this key
+  // whenever the screen regains focus, so coming back to it (e.g. after
+  // viewing a product, or backgrounding the app) always shows real counts.
+  useFocusEffect(
+    useCallback(() => {
+      void queryClient.invalidateQueries({ queryKey: ['seller-products'] });
+    }, [queryClient]),
+  );
+
   return (
     <Screen>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />
+          <RefreshControl
+            refreshing={query.isRefetching}
+            onRefresh={() => void queryClient.invalidateQueries({ queryKey: ['seller-products'] })}
+          />
         }
       >
         <View style={styles.header}>
