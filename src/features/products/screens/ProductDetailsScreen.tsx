@@ -3,7 +3,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   useWindowDimensions,
@@ -14,22 +13,20 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Box,
-  Check,
   ChevronLeft,
-  Pencil,
   Percent,
-  Plus,
   ShoppingBag,
   Tag,
-  Trash2,
   Truck,
 } from 'lucide-react-native';
+// Icons only used by the commented-off DealForm/add-deal UI below:
+// Check, Pencil, Plus, Trash2 — restore alongside that block.
 
 import { Screen } from '../../../components/layout/Screen';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
-import { BottomSheet } from '../../../components/common/BottomSheet';
 import { Badge } from '../../../components/common/Badge';
+// BottomSheet is only used by the commented-off add/edit-deal sheet below.
 import { ImageCarousel } from '../../../components/common/ImageCarousel';
 import { ProductImagePicker, type PickerImage } from '../../../components/common/ProductImagePicker';
 import { Skeleton } from '../../../components/feedback/Skeleton';
@@ -41,15 +38,12 @@ import { UnverifiedGateModal } from '../../../components/common/UnverifiedGateMo
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import { type MainStackParamList } from '../../../navigation/routeConfig';
-import { getProduct, getProducts, updateProduct, type Product, type ProductPayload } from '../products.api';
+import { getProduct, updateProduct, type Product, type ProductPayload } from '../products.api';
+// getProducts, createBogoOffer, updateBogoOffer, createTierOffer,
+// updateTierOffer, updateOfferStatus, deleteOffer — only used by the
+// commented-off DealForm/add-deal UI below; restore alongside that block.
 import {
   getOffers,
-  createBogoOffer,
-  updateBogoOffer,
-  createTierOffer,
-  updateTierOffer,
-  updateOfferStatus,
-  deleteOffer,
   type Offer,
   type OfferType,
 } from '../../deals/offers.api';
@@ -78,21 +72,26 @@ function dealTerms(offer: Offer): string {
   }
 }
 
-function OfferRow({
-  offer,
-  colors,
-  onToggle,
-  onEdit,
-  onDelete,
-  busy,
-}: {
-  offer: Offer;
-  colors: Colors;
-  onToggle: (offer: Offer) => void;
-  onEdit: (offer: Offer) => void;
-  onDelete: (offer: Offer) => void;
-  busy: boolean;
-}) {
+// Read-only — a seller can see a deal (their own shop's or one admin set
+// on this product) but never toggle/edit/remove it here. The interactive
+// version (Switch + edit/delete) is commented off, not deleted:
+//
+//   <Switch
+//     value={offer.isEnabled}
+//     onValueChange={() => onToggle(offer)}
+//     disabled={busy}
+//     trackColor={{ false: colors.buttonSecondaryBg, true: colors.accent }}
+//     thumbColor="#FFFFFF"
+//   />
+//   <View style={styles.offerIconActions}>
+//     <Pressable onPress={() => onEdit(offer)} disabled={busy} hitSlop={8}>
+//       <Pencil size={17} color={colors.textSecondary} />
+//     </Pressable>
+//     <Pressable onPress={() => onDelete(offer)} disabled={busy} hitSlop={8}>
+//       <Trash2 size={17} color={colors.error} />
+//     </Pressable>
+//   </View>
+function OfferRow({ offer, colors }: { offer: Offer; colors: Colors }) {
   const meta = DEAL_TYPE_META[offer.type];
   const Icon = meta.icon;
   const tint = meta.tint(colors);
@@ -111,33 +110,18 @@ function OfferRow({
         </Text>
         <Badge label={meta.label} tone="neutral" />
       </View>
-      <View style={styles.offerActions}>
-        <Switch
-          value={offer.isEnabled}
-          onValueChange={() => onToggle(offer)}
-          disabled={busy}
-          trackColor={{ false: colors.buttonSecondaryBg, true: colors.accent }}
-          thumbColor="#FFFFFF"
-        />
-        <View style={styles.offerIconActions}>
-          <Pressable onPress={() => onEdit(offer)} disabled={busy} hitSlop={8}>
-            <Pencil size={17} color={colors.textSecondary} />
-          </Pressable>
-          <Pressable onPress={() => onDelete(offer)} disabled={busy} hitSlop={8}>
-            <Trash2 size={17} color={colors.error} />
-          </Pressable>
-        </View>
-      </View>
+      <Badge label={offer.isEnabled ? 'Active' : 'Inactive'} tone={offer.isEnabled ? 'success' : 'neutral'} />
     </Card>
   );
 }
 
-const DEAL_TYPE_OPTIONS: { type: OfferType; label: string; description: string; icon: typeof Tag }[] = [
-  { type: 'bogo', label: 'Buy One Get One', description: 'Buy X, get Y free or discounted', icon: ShoppingBag },
-  { type: 'tier_amount', label: 'Spend & Save (₹ off)', description: 'Spend over an amount, get a flat discount', icon: Tag },
-  { type: 'tier_percentage', label: 'Spend & Save (% off)', description: 'Spend over an amount, get a % discount', icon: Percent },
-  { type: 'free_shipping', label: 'Free Shipping', description: 'Free shipping above a spend threshold', icon: Truck },
-];
+// Only used by the commented-off add-deal type picker below.
+// const DEAL_TYPE_OPTIONS: { type: OfferType; label: string; description: string; icon: typeof Tag }[] = [
+//   { type: 'bogo', label: 'Buy One Get One', description: 'Buy X, get Y free or discounted', icon: ShoppingBag },
+//   { type: 'tier_amount', label: 'Spend & Save (₹ off)', description: 'Spend over an amount, get a flat discount', icon: Tag },
+//   { type: 'tier_percentage', label: 'Spend & Save (% off)', description: 'Spend over an amount, get a % discount', icon: Percent },
+//   { type: 'free_shipping', label: 'Free Shipping', description: 'Free shipping above a spend threshold', icon: Truck },
+// ];
 
 // The product photo, as the first item inside each tab's own ScrollView
 // (not a separately-pinned/collapsing header) — same approach the
@@ -497,8 +481,11 @@ function DetailsTab({
 function DealsTab({
   product,
   colors,
-  isVerified,
-  onNeedsVerification,
+  // isVerified/onNeedsVerification are unused while add/edit is commented
+  // off below — kept in the props type so the caller doesn't need to
+  // change, prefixed so the linter doesn't flag them as dead.
+  isVerified: _isVerified,
+  onNeedsVerification: _onNeedsVerification,
   carouselWidth,
   carouselHeight,
 }: {
@@ -509,12 +496,11 @@ function DealsTab({
   carouselWidth: number;
   carouselHeight: number;
 }) {
-  const toast = useToast();
-  const queryClient = useQueryClient();
-
-  const [addSheetOpen, setAddSheetOpen] = useState(false);
-  const [selectedType, setSelectedType] = useState<OfferType | null>(null);
-  const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
+  // Read-only for sellers: a deal on a product may have been set by admin,
+  // so a seller can see it here but never add/edit/enable/remove one
+  // themselves. Add/edit UI (the add-deal button, the type-picker sheet,
+  // DealForm, and the toggle/edit/delete mutations) is commented off below
+  // rather than deleted — see DealForm's own definition further down.
 
   const offersQuery = useQuery({
     queryKey: ['seller-offers', 'list'],
@@ -525,60 +511,65 @@ function DealsTab({
     offer => offer.scope === 'entire_shop' || offer.products.some(p => p._id === product._id),
   );
 
-  const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ['seller-offers'] });
-  };
-
-  const toggleMutation = useMutation({
-    mutationFn: (offer: Offer) => updateOfferStatus(offer._id, !offer.isEnabled),
-    onSuccess: () => {
-      invalidate();
-      toast.show({ type: 'success', title: 'Deal updated' });
-    },
-    onError: (error: Error) => {
-      toast.show({ type: 'error', title: "Couldn't update deal", message: error.message });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (offer: Offer) => deleteOffer(offer._id),
-    onSuccess: () => {
-      invalidate();
-      toast.show({ type: 'success', title: 'Deal removed' });
-    },
-    onError: (error: Error) => {
-      toast.show({ type: 'error', title: "Couldn't remove deal", message: error.message });
-    },
-  });
-
-  const openAddSheet = () => {
-    if (!isVerified) {
-      onNeedsVerification();
-      return;
-    }
-    setEditingOffer(null);
-    setSelectedType(null);
-    setAddSheetOpen(true);
-  };
-
-  const openEditSheet = (offer: Offer) => {
-    if (!isVerified) {
-      onNeedsVerification();
-      return;
-    }
-    setEditingOffer(offer);
-    setSelectedType(offer.type);
-    setAddSheetOpen(true);
-  };
+  // const queryClient = useQueryClient();
+  // const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['seller-offers'] });
+  //
+  // const toggleMutation = useMutation({
+  //   mutationFn: (offer: Offer) => updateOfferStatus(offer._id, !offer.isEnabled),
+  //   onSuccess: () => {
+  //     invalidate();
+  //     toast.show({ type: 'success', title: 'Deal updated' });
+  //   },
+  //   onError: (error: Error) => {
+  //     toast.show({ type: 'error', title: "Couldn't update deal", message: error.message });
+  //   },
+  // });
+  //
+  // const deleteMutation = useMutation({
+  //   mutationFn: (offer: Offer) => deleteOffer(offer._id),
+  //   onSuccess: () => {
+  //     invalidate();
+  //     toast.show({ type: 'success', title: 'Deal removed' });
+  //   },
+  //   onError: (error: Error) => {
+  //     toast.show({ type: 'error', title: "Couldn't remove deal", message: error.message });
+  //   },
+  // });
+  //
+  // const [addSheetOpen, setAddSheetOpen] = useState(false);
+  // const [selectedType, setSelectedType] = useState<OfferType | null>(null);
+  // const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
+  //
+  // const openAddSheet = () => {
+  //   if (!isVerified) {
+  //     onNeedsVerification();
+  //     return;
+  //   }
+  //   setEditingOffer(null);
+  //   setSelectedType(null);
+  //   setAddSheetOpen(true);
+  // };
+  //
+  // const openEditSheet = (offer: Offer) => {
+  //   if (!isVerified) {
+  //     onNeedsVerification();
+  //     return;
+  //   }
+  //   setEditingOffer(offer);
+  //   setSelectedType(offer.type);
+  //   setAddSheetOpen(true);
+  // };
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <ProductHero product={product} colors={colors} width={carouselWidth} height={carouselHeight} />
 
+      {/* Add Deal — seller-side deal creation is off, see comment above.
       <Pressable onPress={openAddSheet} style={[styles.addDealButton, { borderColor: colors.accent }]}>
         <Plus size={16} color={colors.accent} />
         <Text style={[styles.addDealLabel, { color: colors.accent }]}>Add Deal</Text>
       </Pressable>
+      */}
 
       {offersQuery.isLoading ? (
         <View style={{ gap: Spacing.md, marginTop: Spacing.md }}>
@@ -587,24 +578,17 @@ function DealsTab({
         </View>
       ) : productOffers.length === 0 ? (
         <Text style={[styles.emptyDealsText, { color: colors.textSecondary }]}>
-          No deals on this product yet. Add a BOGO or spend-and-save deal to boost sales.
+          No deals on this product yet.
         </Text>
       ) : (
         <View style={{ gap: Spacing.md, marginTop: Spacing.md }}>
           {productOffers.map(offer => (
-            <OfferRow
-              key={offer._id}
-              offer={offer}
-              colors={colors}
-              onToggle={o => toggleMutation.mutate(o)}
-              onEdit={o => openEditSheet(o)}
-              onDelete={o => deleteMutation.mutate(o)}
-              busy={toggleMutation.isPending || deleteMutation.isPending}
-            />
+            <OfferRow key={offer._id} offer={offer} colors={colors} />
           ))}
         </View>
       )}
 
+      {/* Add/edit sheet — seller-side deal creation is off, see comment above.
       <BottomSheet
         visible={addSheetOpen}
         onClose={() => {
@@ -663,10 +647,16 @@ function DealsTab({
           />
         )}
       </BottomSheet>
+      */}
     </ScrollView>
   );
 }
 
+// DealForm — seller-side deal creation/editing, commented off (not
+// deleted). Deals are now admin-set and read-only for sellers in the
+// app (see DealsTab/OfferRow above). Re-enable by uncommenting this
+// block and DealsTab's own commented add/edit sheet.
+/*
 function DealForm({
   type,
   productId,
@@ -915,6 +905,7 @@ function DealForm({
     </ScrollView>
   );
 }
+*/
 
 const styles = StyleSheet.create({
   helperText: {
