@@ -1,8 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -82,7 +84,9 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
         {...panResponder.panHandlers}
       >
         <View style={[styles.handle, { backgroundColor: colors.sheetHandle }]} />
-        {children}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          {children}
+        </KeyboardAvoidingView>
       </Animated.View>
     </Modal>
   );
