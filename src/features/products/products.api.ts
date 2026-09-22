@@ -50,6 +50,10 @@ export interface Product {
   // finalPrice — see backend's models/Product.js#computeDerivedFields.
   sellerPrice?: number;
   discountPercent: number;
+  // >=50% discount, computed server-side from the same threshold the
+  // admin panel and storefront use (constants/massiveDeal.js on the
+  // backend) — never set directly, never edit locally.
+  isMassiveDeal: boolean;
   finalPrice: number;
   variants: ProductVariant[];
   totalStock: number;

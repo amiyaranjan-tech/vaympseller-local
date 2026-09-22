@@ -156,6 +156,12 @@ function ProductHero({
         }
       />
 
+      {product.isMassiveDeal && (
+        <View style={[styles.heroMassiveDealBadge, { backgroundColor: colors.error }]}>
+          <Text style={styles.heroDealBadgeLabel}>Massive Deal</Text>
+        </View>
+      )}
+
       {product.dealType !== 'none' && (() => {
         const dealMeta = DEAL_TYPE_META[product.dealType];
         const DealIcon = dealMeta.icon;
@@ -979,6 +985,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xxs,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+  },
+  heroMassiveDealBadge: {
+    position: 'absolute',
+    top: Spacing.sm,
+    left: Spacing.sm,
     borderRadius: Radius.sm,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,

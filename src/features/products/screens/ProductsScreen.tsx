@@ -167,6 +167,12 @@ function ProductCard({
           <Text style={styles.productImageBadgeLabel}>{STATUS_LABEL[product.status]}</Text>
         </View>
 
+        {product.isMassiveDeal && (
+          <View style={[styles.massiveDealBadge, { backgroundColor: colors.error }]}>
+            <Text style={styles.productImageBadgeLabel}>Massive Deal</Text>
+          </View>
+        )}
+
         {dealBadge && (
           <Pressable
             onPress={onDealPress}
@@ -658,6 +664,14 @@ const styles = StyleSheet.create({
     top: Spacing.sm,
     left: Spacing.sm,
     backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+  },
+  massiveDealBadge: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
     borderRadius: Radius.sm,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 3,
