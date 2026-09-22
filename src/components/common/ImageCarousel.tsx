@@ -26,7 +26,7 @@ export function ImageCarousel({ images, width, height, fallback }: ImageCarousel
     return <Image source={{ uri: images[0].url }} style={{ width, height }} />;
   }
 
-  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = Math.round(event.nativeEvent.contentOffset.x / width);
     if (next !== index) setIndex(next);
   };
@@ -36,9 +36,17 @@ export function ImageCarousel({ images, width, height, fallback }: ImageCarousel
       <ScrollView
         horizontal
         pagingEnabled
+        bounces={false}
+        overScrollMode="never"
+        // These two matter here specifically because a product card's
+        // carousel lives inside a vertically-scrolling list (the grid on
+        // ProductsScreen) — without them the parent can steal a horizontal
+        // swipe before it registers as a page change, same fix the
+        // consumer app's own ProductImageCarousel already applies.
+        nestedScrollEnabled
+        directionalLockEnabled
         showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={32}
+        onMomentumScrollEnd={handleScrollEnd}
       >
         {images.map((img, i) => (
           <Image key={`${img.url}-${i}`} source={{ uri: img.url }} style={{ width, height }} />
