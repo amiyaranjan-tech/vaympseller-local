@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -58,10 +58,31 @@ export function OrderDetailScreen() {
   const [rejectSheetOpen, setRejectSheetOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
 
+  const [now, setNow] = useState(Date.now());
+
   const orderQuery = useQuery({
     queryKey: ['seller-orders', 'detail', orderId],
     queryFn: () => getOrder(orderId),
+    // Once the pack window has run out, poll until the backend scheduler
+    // (30s tick) flips the order to Packed and the Notify rider button shows.
+    refetchInterval: query => {
+      const f = query.state.data?.fulfillment;
+      return f?.sellerStatus === 'Confirmed' && f.autoPackAt && new Date(f.autoPackAt).getTime() <= Date.now()
+        ? 5000
+        : false;
+    },
   });
+
+  const autoPackAt = orderQuery.data?.fulfillment.sellerStatus === 'Confirmed'
+    ? orderQuery.data.fulfillment.autoPackAt
+    : null;
+  useEffect(() => {
+    if (!autoPackAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [autoPackAt]);
+  const packMsLeft = autoPackAt ? Math.max(0, new Date(autoPackAt).getTime() - now) : 0;
+  const packCountdown = `${Math.floor(packMsLeft / 60000)}:${String(Math.floor(packMsLeft / 1000) % 60).padStart(2, '0')}`;
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['seller-orders'] });
@@ -297,6 +318,17 @@ export function OrderDetailScreen() {
         </View>
       )}
 
+      {autoPackAt && (
+        <View style={[styles.footer, styles.packFooter, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
+          <Text style={[styles.packLabel, { color: colors.textSecondary }]}>
+            {packMsLeft > 0 ? 'Pack the order — Notify rider unlocks in' : 'Getting ready for pickup…'}
+          </Text>
+          {packMsLeft > 0 && (
+            <Text style={[styles.packTimer, { color: colors.textPrimary }]}>{packCountdown}</Text>
+          )}
+        </View>
+      )}
+
       {fulfillment?.sellerStatus === 'Packed' && !fulfillment.rider && (
         <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
           <Button
@@ -502,6 +534,19 @@ const styles = StyleSheet.create({
   },
   footerButtonFull: {
     flex: 1,
+  },
+  packFooter: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: Spacing.xxs,
+  },
+  packLabel: {
+    fontSize: FontSize.sm,
+  },
+  packTimer: {
+    fontSize: FontSize.xxl,
+    fontWeight: FontWeight.bold,
+    fontVariant: ['tabular-nums'],
   },
   sheetTitle: {
     fontSize: FontSize.lg,

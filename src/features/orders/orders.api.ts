@@ -43,6 +43,9 @@ export interface OrderFulfillment {
   deliveredAt: string | null;
   cancelledAt: string | null;
   cancellationReason: string;
+  // Set on Confirm (+5 min); the backend scheduler flips the order to
+  // Packed once it passes.
+  autoPackAt: string | null;
   // Populated once a rider has accepted (see notify-rider/accept on the
   // backend); a bare id would mean it wasn't populated, which shouldn't
   // happen through this API's own endpoints.
