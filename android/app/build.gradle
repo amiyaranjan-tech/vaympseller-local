@@ -1,6 +1,12 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+// Release APKs must hit the live API — .env (local dev, localhost) would
+// otherwise be baked into them too. Must be set before dotenv.gradle.
+project.ext.envConfigFiles = [
+    debug: ".env",
+    release: ".env.production",
+]
 apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
 // Reads android/app/google-services.json and generates the resources
 // @react-native-firebase reads at runtime.
