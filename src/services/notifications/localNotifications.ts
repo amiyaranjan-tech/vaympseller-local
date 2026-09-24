@@ -30,27 +30,43 @@ const CHANNEL_ID = 'default';
 // (see the backend's services/notification/firebaseProvider.js).
 const SOUND_NAME = 'notification_sound';
 
-let channelReady: Promise<void> | null = null;
+// New orders get their own channel + sound (res/raw/new_order_sound.mp3).
+// Must match the channelId/sound the backend puts on new_order pushes
+// (sellerNotification.service.js#notifyNewOrder) so the background/killed
+// case plays it too, not just foreground.
+const NEW_ORDER_CHANNEL_ID = 'new_order';
+const NEW_ORDER_SOUND_NAME = 'new_order_sound';
+
+let channelsReady: Promise<void> | null = null;
 
 // Android only ever honors a channel's sound as set at CREATION time —
 // changing it later requires deleting and recreating the channel, which
-// would drop the user's own notification settings for it.
-function ensureChannel(): Promise<void> {
-  if (!channelReady) {
-    channelReady = notifee
-      .createChannel({
+// would drop the user's own notification settings for it. Also called at
+// startup (notificationService.ts#initNotifications): a background push
+// naming a channel that doesn't exist yet falls back to FCM's default one.
+export function ensureChannels(): Promise<void> {
+  if (!channelsReady) {
+    channelsReady = Promise.all([
+      notifee.createChannel({
         id: CHANNEL_ID,
         name: 'General',
         importance: AndroidImportance.HIGH,
         sound: SOUND_NAME,
-      })
+      }),
+      notifee.createChannel({
+        id: NEW_ORDER_CHANNEL_ID,
+        name: 'New Orders',
+        importance: AndroidImportance.HIGH,
+        sound: NEW_ORDER_SOUND_NAME,
+      }),
+    ])
       .then(() => undefined)
       .catch(error => {
         console.log('[localNotifications] createChannel failed', error);
       });
   }
 
-  return channelReady;
+  return channelsReady;
 }
 
 export async function displayForegroundNotification({
@@ -63,21 +79,25 @@ export async function displayForegroundNotification({
   data?: Record<string, string>;
 }) {
   try {
-    await ensureChannel();
+    await ensureChannels();
+
+    const isNewOrder = data?.type === 'new_order';
+    const channelId = isNewOrder ? NEW_ORDER_CHANNEL_ID : CHANNEL_ID;
+    const sound = isNewOrder ? NEW_ORDER_SOUND_NAME : SOUND_NAME;
 
     await notifee.displayNotification({
       title,
       body,
       data,
       android: {
-        channelId: CHANNEL_ID,
+        channelId,
         smallIcon: 'ic_notification',
         color: '#4342FF',
         pressAction: { id: 'default' },
         // Android 8+ (the vast majority of real devices) only ever plays
-        // the CHANNEL's own sound (set in ensureChannel above) — this is
+        // the CHANNEL's own sound (set in ensureChannels above) — this is
         // the pre-8 fallback, harmless but inert on modern devices.
-        sound: SOUND_NAME,
+        sound,
       },
     });
   } catch (error) {

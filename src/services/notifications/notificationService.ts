@@ -15,6 +15,7 @@ import {
 import { ensureNotificationPermission } from './notificationPermissions';
 import {
   displayForegroundNotification,
+  ensureChannels,
   initLocalNotificationTapHandling,
 } from './localNotifications';
 
@@ -133,6 +134,8 @@ export function initNotifications() {
   void registerCurrentToken();
 
   if (!IS_ANDROID) return;
+
+  void ensureChannels();
 
   onTokenRefresh(async newToken => {
     if (!useAuthStore.getState().isAuthenticated) return;
