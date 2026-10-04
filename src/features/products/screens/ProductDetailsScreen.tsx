@@ -306,7 +306,8 @@ function DetailsTab({
     String(product.sellerPrice ?? product.finalPrice),
   );
   const [isReturnable, setIsReturnable] = useState(product.isReturnable);
-  const [tryAndBuy, setTryAndBuy] = useState(product.tryAndBuy);
+  // Try & Buy is derived server-side from isReturnable; Inner Wear is never returnable.
+  const isInnerWear = product.category === 'Inner Wear';
   const [images, setImages] = useState<PickerImage[]>(product.images);
 
   // Re-sync local edit state whenever a fresh product loads (e.g. after
@@ -318,7 +319,6 @@ function DetailsTab({
     setSellingPrice(String(product.sellingPrice));
     setSellerPrice(String(product.sellerPrice ?? product.finalPrice));
     setIsReturnable(product.isReturnable);
-    setTryAndBuy(product.tryAndBuy);
     setImages(product.images);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product._id, product.updatedAt]);
@@ -359,8 +359,7 @@ function DetailsTab({
       tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       sellingPrice: Number(sellingPrice) || 0,
       sellerPrice: Number(sellerPrice) || 0,
-      isReturnable,
-      tryAndBuy,
+      isReturnable: isReturnable && !isInnerWear,
       images,
     });
   };
@@ -448,27 +447,18 @@ function DetailsTab({
         <FlagCheckbox
           title="Returnable"
           description="Customers can return this product"
-          checked={isReturnable}
-          onToggle={() => {
-            const next = !isReturnable;
-            setIsReturnable(next);
-            if (!next) setTryAndBuy(false);
-          }}
+          checked={isReturnable && !isInnerWear}
+          disabled={isInnerWear}
+          onToggle={() => setIsReturnable(v => !v)}
           colors={colors}
         />
-        <FlagCheckbox
-          title="Try & Buy"
-          description="Allow customers to try this product before buying"
-          checked={tryAndBuy}
-          disabled={!isReturnable}
-          onToggle={() => setTryAndBuy(v => !v)}
-          colors={colors}
-        />
-        {!isReturnable && (
-          <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-            Non-returnable products aren't eligible for Try & Buy.
-          </Text>
-        )}
+        <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+          {isInnerWear
+            ? "Inner Wear is always non-returnable, so it isn't Try & Buy."
+            : isReturnable
+              ? 'Returnable products are automatically Try & Buy.'
+              : "Non-returnable products aren't eligible for Try & Buy."}
+        </Text>
       </Card>
 
       <View style={styles.footer}>

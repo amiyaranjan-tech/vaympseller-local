@@ -139,7 +139,8 @@ export function AddProductScreen() {
   const [isNewArrival, setIsNewArrival] = useState(false);
   const [isLimitedStock, setIsLimitedStock] = useState(false);
   const [isReturnable, setIsReturnable] = useState(true);
-  const [tryAndBuy, setTryAndBuy] = useState(true);
+  // Try & Buy is derived server-side from isReturnable; Inner Wear is never returnable.
+  const isInnerWear = category === 'Inner Wear';
 
   // Media
   const [images, setImages] = useState<PickerImage[]>([]);
@@ -287,8 +288,7 @@ export function AddProductScreen() {
       isTrending,
       isNewArrival,
       isLimitedStock,
-      isReturnable,
-      tryAndBuy,
+      isReturnable: isReturnable && !isInnerWear,
       images,
       video: video.trim() || undefined,
     });
@@ -565,27 +565,18 @@ export function AddProductScreen() {
               <FlagCheckbox
                 title="Returnable"
                 description="Customers can return this product"
-                checked={isReturnable}
-                onToggle={() => {
-                  const next = !isReturnable;
-                  setIsReturnable(next);
-                  if (!next) setTryAndBuy(false);
-                }}
+                checked={isReturnable && !isInnerWear}
+                disabled={isInnerWear}
+                onToggle={() => setIsReturnable(v => !v)}
                 colors={colors}
               />
-              <FlagCheckbox
-                title="Try & Buy"
-                description="Allow customers to try this product before buying"
-                checked={tryAndBuy}
-                disabled={!isReturnable}
-                onToggle={() => setTryAndBuy(v => !v)}
-                colors={colors}
-              />
-              {!isReturnable && (
-                <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-                  Non-returnable products aren't eligible for Try & Buy.
-                </Text>
-              )}
+              <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+                {isInnerWear
+                  ? "Inner Wear is always non-returnable, so it isn't Try & Buy."
+                  : isReturnable
+                    ? 'Returnable products are automatically Try & Buy.'
+                    : "Non-returnable products aren't eligible for Try & Buy."}
+              </Text>
 
               <View style={[styles.infoBanner, { backgroundColor: colors.info10 }]}>
                 <Info size={16} color={colors.info} />
