@@ -17,11 +17,23 @@ try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { getMessaging, setBackgroundMessageHandler } = require('@react-native-firebase/messaging');
 
-  setBackgroundMessageHandler(getMessaging(), async () => {
-    // No-op — the OS already displays the notification from its own
-    // `notification` payload; this only needs to exist so the app doesn't
-    // warn about a missing handler. Foreground handling is wired in
-    // src/services/notifications/notificationService.ts.
+  setBackgroundMessageHandler(getMessaging(), async message => {
+    // Regular pushes are displayed by the OS from their `notification`
+    // payload. The new-order alert is data-only, so it's drawn here (looping
+    // sound until the order is handled) — see localNotifications.ts.
+    const { handleOrderAlertData } = require('./src/services/notifications/localNotifications');
+    handleOrderAlertData(message.data);
+  });
+
+  // Tapping a Notifee-drawn notification (the new-order alert) while the
+  // app is in the background — open that order.
+  const notifee = require('@notifee/react-native').default;
+  const { EventType } = require('@notifee/react-native');
+  notifee.onBackgroundEvent(async ({ type, detail }) => {
+    if (type === EventType.PRESS) {
+      const { handleMessageTap } = require('./src/services/notifications/notificationService');
+      handleMessageTap(detail.notification?.data);
+    }
   });
 } catch (error) {
   console.log('[index] Firebase background handler registration failed', error);

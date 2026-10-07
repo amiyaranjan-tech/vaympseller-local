@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -23,6 +23,7 @@ import {
   rejectOrder,
   type OrderFulfillmentStatus,
 } from '../orders.api';
+import { stopNewOrderAlert } from '../../../services/notifications/localNotifications';
 
 type Nav = NativeStackNavigationProp<MainStackParamList, 'OrderDetail'>;
 type Route = RouteProp<MainStackParamList, 'OrderDetail'>;
@@ -71,6 +72,13 @@ export function OrderDetailScreen() {
         : false;
     },
   });
+
+  // Order no longer waiting on the seller (accepted/rejected here or
+  // elsewhere, or cancelled) — silence its looping new-order alert.
+  const sellerStatus = orderQuery.data?.fulfillment.sellerStatus;
+  useEffect(() => {
+    if (sellerStatus && sellerStatus !== 'Pending') stopNewOrderAlert(orderId);
+  }, [sellerStatus, orderId]);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['seller-orders'] });

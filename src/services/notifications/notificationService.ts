@@ -13,9 +13,12 @@ import {
   getInitialNotification,
 } from './pushClient';
 import { ensureNotificationPermission } from './notificationPermissions';
+import notifee from '@notifee/react-native';
+
 import {
   displayForegroundNotification,
   ensureChannels,
+  handleOrderAlertData,
   initLocalNotificationTapHandling,
 } from './localNotifications';
 
@@ -85,7 +88,7 @@ function navigateOnceReady(navigate: () => void, attemptsLeft = 30) {
   setTimeout(() => navigateOnceReady(navigate, attemptsLeft - 1), 100);
 }
 
-function handleMessageTap(data?: Record<string, string>) {
+export function handleMessageTap(data?: Record<string, string>) {
   void queryClient.invalidateQueries({ queryKey: ['seller-notifications'] });
   void queryClient.invalidateQueries({ queryKey: ['seller-orders'] });
 
@@ -162,6 +165,12 @@ export function initNotifications() {
   onMessage(message => {
     void queryClient.invalidateQueries({ queryKey: ['seller-notifications'] });
 
+    // Data-only new-order alert / its "handled" stop signal.
+    if (handleOrderAlertData(message.data as Record<string, string> | undefined)) {
+      void queryClient.invalidateQueries({ queryKey: ['seller-orders'] });
+      return;
+    }
+
     const notification = message.notification;
     if (!notification) return;
 
@@ -175,6 +184,12 @@ export function initNotifications() {
   initLocalNotificationTapHandling(data => handleMessageTap(data));
 
   onNotificationOpenedApp(message => handleMessageTap(message.data as Record<string, string> | undefined));
+
+  // App launched from killed state by tapping a Notifee-drawn notification
+  // (the new-order alert) — FCM's getInitialNotification below never sees those.
+  void notifee.getInitialNotification().then(initial => {
+    if (initial) handleMessageTap(initial.notification.data as Record<string, string> | undefined);
+  });
 
   void getInitialNotification().then(message => {
     if (message) handleMessageTap(message.data as Record<string, string> | undefined);

@@ -31,10 +31,12 @@ const CHANNEL_ID = 'default';
 const SOUND_NAME = 'notification_sound';
 
 // New orders get their own channel + sound (res/raw/new_order_sound.mp3).
-// Must match the channelId/sound the backend puts on new_order pushes
-// (sellerNotification.service.js#notifyNewOrder) so the background/killed
-// case plays it too, not just foreground.
-const NEW_ORDER_CHANNEL_ID = 'new_order';
+// The backend sends new_order as a DATA-ONLY push, so the app itself draws
+// it (displayNewOrderAlert) in every state — foreground, background and
+// killed. A fresh channel id: Android fixes a channel's sound at creation,
+// and the old "new_order" channel was created with the previous sound.
+const NEW_ORDER_CHANNEL_ID = 'new_order_alert';
+const LEGACY_NEW_ORDER_CHANNEL_ID = 'new_order';
 const NEW_ORDER_SOUND_NAME = 'new_order_sound';
 
 let channelsReady: Promise<void> | null = null;
@@ -58,7 +60,9 @@ export function ensureChannels(): Promise<void> {
         name: 'New Orders',
         importance: AndroidImportance.HIGH,
         sound: NEW_ORDER_SOUND_NAME,
+        vibration: true,
       }),
+      notifee.deleteChannel(LEGACY_NEW_ORDER_CHANNEL_ID),
     ])
       .then(() => undefined)
       .catch(error => {
@@ -103,6 +107,62 @@ export async function displayForegroundNotification({
   } catch (error) {
     console.log('[localNotifications] displayNotification failed', error);
   }
+}
+
+const newOrderAlertId = (orderId: string) => `new_order_${orderId}`;
+
+// The new-order alert: its sound LOOPS (Android's insistent flag) and it
+// can't be swiped away, until the order is accepted/rejected — then
+// stopNewOrderAlert cancels it (from the app, or via the backend's
+// "new_order_handled" push when it's handled elsewhere). Android itself
+// also stops the looping once the seller opens the notification shade.
+export async function displayNewOrderAlert(data: Record<string, string>) {
+  try {
+    await ensureChannels();
+
+    await notifee.displayNotification({
+      id: newOrderAlertId(data.orderId),
+      title: data.title || 'New order',
+      body: data.body,
+      data,
+      android: {
+        channelId: NEW_ORDER_CHANNEL_ID,
+        smallIcon: 'ic_notification',
+        color: '#4342FF',
+        importance: AndroidImportance.HIGH,
+        pressAction: { id: 'default', launchActivity: 'default' },
+        sound: NEW_ORDER_SOUND_NAME,
+        loopSound: true,
+        ongoing: true,
+        autoCancel: false,
+      },
+    });
+  } catch (error) {
+    console.log('[localNotifications] displayNewOrderAlert failed', error);
+  }
+}
+
+export function stopNewOrderAlert(orderId: string) {
+  notifee.cancelNotification(newOrderAlertId(orderId)).catch(() => undefined);
+}
+
+// Data-only pushes (new_order / new_order_handled) — the same handling for
+// the foreground (notificationService.ts) and background/killed (index.js)
+// cases. Returns whether the message was one of these.
+export function handleOrderAlertData(data?: Record<string, string>): boolean {
+  if (!data?.orderId) return false;
+
+  if (data.type === 'new_order') {
+    void displayNewOrderAlert(data);
+    return true;
+  }
+
+  if (data.type === 'new_order_handled') {
+    stopNewOrderAlert(data.orderId);
+    return true;
+  }
+
+  return false;
 }
 
 /** Tapping a locally-displayed (foreground) notification. */
