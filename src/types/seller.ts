@@ -51,6 +51,9 @@ export interface SellerProfile {
   revenue: number;
   commission: number;
   commissionRate: number | null;
+  // Only on GET /seller-auth/me — read-only commission for the product
+  // form's price breakdown (set by Vaymp admin, not the seller).
+  effectiveCommissionRate?: number;
   orders: number;
   returns: number;
   refunds: number;

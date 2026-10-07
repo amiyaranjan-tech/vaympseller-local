@@ -39,6 +39,7 @@ import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import { type MainStackParamList } from '../../../navigation/routeConfig';
 import { getProduct, updateProduct, type Product, type ProductPayload } from '../products.api';
+import { PricingBreakdown, discountedPrice, sellerDiscountPercent } from '../PricingBreakdown';
 // getProducts, createBogoOffer, updateBogoOffer, createTierOffer,
 // updateTierOffer, updateOfferStatus, deleteOffer — only used by the
 // commented-off DealForm/add-deal UI below; restore alongside that block.
@@ -299,12 +300,12 @@ function DetailsTab({
   const [description, setDescription] = useState(product.description);
   const [tags, setTags] = useState(product.tags.join(', '));
   const [sellingPrice, setSellingPrice] = useState(String(product.sellingPrice));
-  // A product created before this field existed has no sellerPrice yet —
-  // fall back to its current finalPrice (what it already sells for) so
-  // opening this screen never silently zeroes out its pricing on save.
-  const [sellerPrice, setSellerPrice] = useState(
-    String(product.sellerPrice ?? product.finalPrice),
-  );
+  // The seller's own discount %, recovered from sellerPrice. A product
+  // created before sellerPrice existed falls back to its finalPrice (what
+  // it already sells for) so saving never silently changes its pricing.
+  const initialDiscount = () =>
+    String(sellerDiscountPercent(product.sellingPrice, product.sellerPrice ?? product.finalPrice));
+  const [discountPercent, setDiscountPercent] = useState(initialDiscount);
   const [isReturnable, setIsReturnable] = useState(product.isReturnable);
   // Try & Buy is derived server-side from isReturnable; Inner Wear is never returnable.
   const isInnerWear = product.category === 'Inner Wear';
@@ -317,18 +318,11 @@ function DetailsTab({
     setDescription(product.description);
     setTags(product.tags.join(', '));
     setSellingPrice(String(product.sellingPrice));
-    setSellerPrice(String(product.sellerPrice ?? product.finalPrice));
+    setDiscountPercent(initialDiscount());
     setIsReturnable(product.isReturnable);
     setImages(product.images);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product._id, product.updatedAt]);
-
-  const yourDiscountPercent = (() => {
-    const total = Number(sellingPrice) || 0;
-    const seller = Number(sellerPrice) || 0;
-    if (total <= 0) return 0;
-    return Math.max(0, Math.round(((total - seller) / total) * 100));
-  })();
 
   const saveMutation = useMutation({
     mutationFn: (payload: Partial<ProductPayload>) => updateProduct(product._id, payload),
@@ -358,7 +352,7 @@ function DetailsTab({
       description,
       tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       sellingPrice: Number(sellingPrice) || 0,
-      sellerPrice: Number(sellerPrice) || 0,
+      sellerPrice: discountedPrice(sellingPrice, discountPercent),
       isReturnable: isReturnable && !isInnerWear,
       images,
     });
@@ -426,20 +420,15 @@ function DetailsTab({
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Pricing</Text>
         <View style={styles.row}>
           <View style={styles.col}>
-            <FieldLabel label="Total Price" required colors={colors} />
+            <FieldLabel label="MRP (Selling Price)" required colors={colors} />
             <CountedInput value={sellingPrice} onChangeText={setSellingPrice} placeholder="0" maxLength={10} keyboardType="number-pad" colors={colors} />
           </View>
           <View style={styles.col}>
-            <FieldLabel label="Discounted Price" required colors={colors} />
-            <CountedInput value={sellerPrice} onChangeText={setSellerPrice} placeholder="0" maxLength={10} keyboardType="number-pad" colors={colors} />
+            <FieldLabel label="Discount %" required colors={colors} />
+            <CountedInput value={discountPercent} onChangeText={setDiscountPercent} placeholder="0" maxLength={3} keyboardType="number-pad" colors={colors} />
           </View>
         </View>
-        <View style={[styles.finalPriceRow, { borderTopColor: colors.divider }]}>
-          <Text style={[styles.finalPriceLabel, { color: colors.textSecondary }]}>You get paid</Text>
-          <Text style={[styles.finalPriceValue, { color: colors.textPrimary }]}>
-            ₹{(Number(sellerPrice) || 0).toLocaleString('en-IN')} ({yourDiscountPercent}% off)
-          </Text>
-        </View>
+        <PricingBreakdown mrp={sellingPrice} discountPercent={discountPercent} colors={colors} />
       </Card>
 
       <Card style={styles.section}>
@@ -1039,21 +1028,6 @@ const styles = StyleSheet.create({
   tagsInput: {
     paddingHorizontal: Spacing.md,
     fontSize: FontSize.md,
-  },
-  finalPriceRow: {
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  finalPriceLabel: {
-    fontSize: FontSize.sm,
-  },
-  finalPriceValue: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
   },
   footer: {
     marginTop: Spacing.xl,

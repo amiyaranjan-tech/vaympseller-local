@@ -19,6 +19,7 @@ import { FontSize, FontWeight } from '../../../theme/typography';
 import type { MainStackParamList } from '../../../navigation/routeConfig';
 import { createProduct, type ProductGender, type ProductPayload, type ProductVariant } from '../products.api';
 import { useProductTaxonomy } from '../useProductTaxonomy';
+import { PricingBreakdown, discountedPrice } from '../PricingBreakdown';
 
 // Mirrors the admin panel's own product wizard (src/pages/products/
 // ProductForm.tsx) step-for-step — Basics/Pricing/Inventory/Attributes/
@@ -113,14 +114,10 @@ export function AddProductScreen() {
   const [subcategory, setSubcategory] = useState('');
   const [tags, setTags] = useState('');
 
-  // Pricing — Total Price is the pre-discount (MRP-style) price, struck
-  // through for buyers; Discounted Price is what the seller actually gets
-  // paid. The buyer-facing discount %/final price are computed server-side
-  // from these two (see backend's models/Product.js#computeDerivedFields),
-  // not shown live here since that also depends on an admin-configured
-  // margin setting this screen has no visibility into.
+  // Pricing — mirrors the admin ProductForm: the seller types MRP and their
+  // discount %; the rest is a read-only breakdown (see PricingBreakdown).
   const [sellingPrice, setSellingPrice] = useState('2000');
-  const [sellerPrice, setSellerPrice] = useState('900');
+  const [discountPercent, setDiscountPercent] = useState('55');
 
   // Inventory
   const [variants, setVariants] = useState<VariantRow[]>([emptyVariant()]);
@@ -159,13 +156,6 @@ export function AddProductScreen() {
     refreshBrands,
   } = useProductTaxonomy(gender.toLowerCase(), category, subcategory);
 
-  const yourDiscountPercent = (() => {
-    const total = Number(sellingPrice) || 0;
-    const seller = Number(sellerPrice) || 0;
-    if (total <= 0) return 0;
-    return Math.max(0, Math.round(((total - seller) / total) * 100));
-  })();
-
   const createMutation = useMutation({
     mutationFn: (payload: ProductPayload) => createProduct(payload),
     onError: (error: Error) => {
@@ -198,9 +188,9 @@ export function AddProductScreen() {
       nextErrors.category = !category;
       nextErrors.subcategory = !subcategory;
     } else if (index === 1) {
-      nextErrors.sellingPrice = !sellingPrice.trim();
-      nextErrors.sellerPrice =
-        !sellerPrice.trim() || Number(sellerPrice) > Number(sellingPrice || 0);
+      nextErrors.sellingPrice = !(Number(sellingPrice) > 0);
+      nextErrors.discountPercent =
+        !discountPercent.trim() || !(Number(discountPercent) >= 0 && Number(discountPercent) <= 100);
     } else if (index === 2) {
       nextErrors.variants = variants.length === 0 || variants.some(v => !v.size.trim());
     }
@@ -279,7 +269,7 @@ export function AddProductScreen() {
       subcategory,
       tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       sellingPrice: Number(sellingPrice) || 0,
-      sellerPrice: Number(sellerPrice) || 0,
+      sellerPrice: discountedPrice(sellingPrice, discountPercent),
       variants: payloadVariants,
       color,
       season,
@@ -453,28 +443,21 @@ export function AddProductScreen() {
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Pricing</Text>
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <FieldLabel label="Total Price" required colors={colors} />
+                  <FieldLabel label="MRP (Selling Price)" required colors={colors} />
                   <CountedInput value={sellingPrice} onChangeText={setSellingPrice} placeholder="0" maxLength={10} keyboardType="number-pad" colors={colors} />
                 </View>
                 <View style={styles.col}>
-                  <FieldLabel label="Discounted Price" required colors={colors} />
-                  <CountedInput value={sellerPrice} onChangeText={setSellerPrice} placeholder="0" maxLength={10} keyboardType="number-pad" colors={colors} />
+                  <FieldLabel label="Discount %" required colors={colors} />
+                  <CountedInput value={discountPercent} onChangeText={setDiscountPercent} placeholder="0" maxLength={3} keyboardType="number-pad" colors={colors} />
                 </View>
               </View>
-              {(errors.sellingPrice || errors.sellerPrice) && (
+              {(errors.sellingPrice || errors.discountPercent) && (
                 <Text style={[styles.errorText, { color: colors.error }]}>
-                  Enter both prices — Discounted Price can't be more than Total Price
+                  Enter an MRP and a discount between 0 and 100%
                 </Text>
               )}
 
-              <View style={[styles.finalPriceRow, { backgroundColor: colors.grey100 }]}>
-                <Text style={[styles.finalPriceLabel, { color: colors.textSecondary }]}>
-                  You get paid
-                </Text>
-                <Text style={[styles.finalPriceValue, { color: colors.textPrimary }]}>
-                  ₹{(Number(sellerPrice) || 0).toLocaleString('en-IN')} ({yourDiscountPercent}% off)
-                </Text>
-              </View>
+              <PricingBreakdown mrp={sellingPrice} discountPercent={discountPercent} colors={colors} />
             </>
           )}
 
@@ -759,21 +742,6 @@ const styles = StyleSheet.create({
   tagsInput: {
     paddingHorizontal: Spacing.md,
     fontSize: FontSize.md,
-  },
-  finalPriceRow: {
-    marginTop: Spacing.sm,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  finalPriceLabel: {
-    fontSize: FontSize.sm,
-  },
-  finalPriceValue: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
   },
   variantRow: {
     flexDirection: 'row',

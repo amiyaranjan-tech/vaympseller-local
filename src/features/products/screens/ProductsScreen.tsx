@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -291,6 +292,37 @@ export function ProductsScreen() {
     },
   });
 
+  // Bulk "Submit for Review" — no bulk endpoint, so it loops the same
+  // per-product status call the card button uses. allSettled so one
+  // failing product (e.g. missing images) doesn't stop the rest.
+  const bulkSubmitMutation = useMutation({
+    mutationFn: async (count: number) => {
+      const drafts = await getProducts({ status: 'draft', limit: count });
+      const results = await Promise.allSettled(
+        drafts.items.map(p => updateProductStatus(p._id, 'pending_review')),
+      );
+      const failed = results.filter(r => r.status === 'rejected') as PromiseRejectedResult[];
+      return { submitted: results.length - failed.length, failed };
+    },
+    onSuccess: ({ submitted, failed }) => {
+      toast.show(
+        failed.length === 0
+          ? { type: 'success', title: `${submitted} product(s) submitted for review` }
+          : {
+              type: 'error',
+              title: `${submitted} submitted, ${failed.length} failed`,
+              message: failed[0].reason instanceof Error ? failed[0].reason.message : undefined,
+            },
+      );
+    },
+    onError: (error: Error) => {
+      toast.show({ type: 'error', title: "Couldn't submit products", message: error.message });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['seller-products'] });
+    },
+  });
+
   // Per-tab counts — the backend has no aggregate "counts by status"
   // endpoint (see PROJECT_NOTES.md), so this is one cheap limit:1 list
   // call per filter tab, read for its `pagination.total`. Swap for a
@@ -303,6 +335,19 @@ export function ProductsScreen() {
       staleTime: 30000,
     })),
   });
+
+  const draftCount =
+    filterCounts[PRODUCT_FILTERS.indexOf('Draft')]?.data?.pagination.total ?? 0;
+
+  const confirmBulkSubmit = () =>
+    Alert.alert(
+      'Submit all drafts?',
+      `Send ${draftCount} draft product(s) to Vaymp for review?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Submit', onPress: () => bulkSubmitMutation.mutate(draftCount) },
+      ],
+    );
 
   const rawItems = query.data?.items ?? [];
   const items = filter === 'Deals' ? rawItems.filter(p => p.dealType !== 'none') : rawItems;
@@ -418,6 +463,21 @@ export function ProductsScreen() {
             );
           })}
         </ScrollView>
+
+        {draftCount > 0 && (
+          <Pressable
+            onPress={confirmBulkSubmit}
+            disabled={bulkSubmitMutation.isPending}
+            style={[styles.submitButton, styles.bulkSubmitButton, { backgroundColor: colors.accent10 }]}
+          >
+            <Send size={15} color={colors.accent} />
+            <Text style={[styles.submitButtonLabel, { color: colors.accent }]} numberOfLines={1}>
+              {bulkSubmitMutation.isPending
+                ? 'Submitting…'
+                : `Submit all ${draftCount} draft(s) for review`}
+            </Text>
+          </Pressable>
+        )}
 
         {query.isLoading ? (
           <View style={styles.skeletonList}>
@@ -758,6 +818,11 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.sm,
     marginBottom: Spacing.sm,
     borderRadius: Radius.sm,
+  },
+  bulkSubmitButton: {
+    marginHorizontal: 0,
+    marginBottom: Spacing.md,
+    paddingVertical: Spacing.md,
   },
   submitButtonLabel: {
     fontSize: FontSize.xs,
