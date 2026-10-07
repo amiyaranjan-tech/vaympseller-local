@@ -50,7 +50,7 @@ export function PricingBreakdown({
         </View>
       ))}
       <View style={[styles.row, styles.total, { borderTopColor: colors.border }]}>
-        <Text style={[styles.label, { color: colors.textPrimary }]}>Cost price (you get)</Text>
+        <Text style={[styles.label, { color: colors.textPrimary }]}>Final price after all deductions (you get)</Text>
         <Text style={[styles.totalValue, { color: colors.textPrimary }]}>
           {rupees(sellerPrice - commission)}
         </Text>
