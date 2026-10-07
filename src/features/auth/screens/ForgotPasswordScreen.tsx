@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Screen } from '../../../components/layout/Screen';
+import { FormScrollView } from '../../../components/layout/FormScrollView';
 import { AppHeader } from '../../../components/layout/AppHeader';
 import { Button } from '../../../components/common/Button';
 import { FormTextInput } from '../../../components/forms/FormTextInput';
@@ -46,7 +47,7 @@ export function ForgotPasswordScreen({ navigation }: Props) {
   return (
     <Screen>
       <AppHeader title="Reset password" onBack={() => navigation.goBack()} />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <FormScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           {sent
             ? "If that email is on a shop account, we've sent a reset link — open it, then paste the token here."
@@ -76,7 +77,7 @@ export function ForgotPasswordScreen({ navigation }: Props) {
             style={styles.submit}
           />
         )}
-      </ScrollView>
+      </FormScrollView>
     </Screen>
   );
 }

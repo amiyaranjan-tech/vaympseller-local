@@ -23,6 +23,7 @@ import {
 // Check, Pencil, Plus, Trash2 — restore alongside that block.
 
 import { Screen } from '../../../components/layout/Screen';
+import { FormScrollView } from '../../../components/layout/FormScrollView';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { Badge } from '../../../components/common/Badge';
@@ -359,7 +360,7 @@ function DetailsTab({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <FormScrollView contentContainerStyle={styles.content}>
       <ProductHero
         product={product}
         colors={colors}
@@ -459,7 +460,7 @@ function DetailsTab({
           style={styles.footerButton}
         />
       </View>
-    </ScrollView>
+    </FormScrollView>
   );
 }
 

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react-native';
 
 import { Screen } from '../../../components/layout/Screen';
+import { FormScrollView } from '../../../components/layout/FormScrollView';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { Badge } from '../../../components/common/Badge';
@@ -240,7 +241,7 @@ export function ShopDetailsScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
+      <FormScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Pressable
             onPress={() => navigation.goBack()}
@@ -444,7 +445,7 @@ export function ShopDetailsScreen() {
             />
           )}
         </View>
-      </ScrollView>
+      </FormScrollView>
 
       {seller && (
         <AdminPreviewSheet

@@ -79,7 +79,7 @@ export function BrandSelectField({ value, options, onSelect, onBrandAdded }: Bra
           />
         </View>
 
-        <ScrollView style={styles.sheetList}>
+        <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
           {filtered.map(option => (
             <Pressable
               key={option}

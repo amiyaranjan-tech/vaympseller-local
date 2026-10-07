@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Info, Plus, Trash2, X } from 'lucide-react-native';
 
 import { Screen } from '../../../components/layout/Screen';
+import { FormScrollView } from '../../../components/layout/FormScrollView';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { BottomSheet } from '../../../components/common/BottomSheet';
@@ -78,7 +79,7 @@ function VariantSizePicker({
 
       <BottomSheet visible={open} onClose={() => setOpen(false)}>
         <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Size</Text>
-        <ScrollView style={styles.sizeSheetList}>
+        <ScrollView style={styles.sizeSheetList} keyboardShouldPersistTaps="handled">
           {options.map(option => (
             <Pressable
               key={option}
@@ -286,7 +287,7 @@ export function AddProductScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
+      <FormScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Pressable
             onPress={goBack}
@@ -611,7 +612,7 @@ export function AddProductScreen() {
             />
           )}
         </View>
-      </ScrollView>
+      </FormScrollView>
 
       <BottomSheet visible={attributeSheetOpen} onClose={() => setAttributeSheetOpen(false)}>
         <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Add Attribute</Text>

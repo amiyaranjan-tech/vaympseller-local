@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   PanResponder,
@@ -33,6 +34,9 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
 
   useEffect(() => {
     if (visible) {
+      // Drop the form's keyboard so the sheet (e.g. a dropdown's options)
+      // isn't opened underneath it.
+      Keyboard.dismiss();
       translateY.setValue(400);
       Animated.spring(translateY, {
         toValue: 0,

@@ -146,7 +146,7 @@ export function SelectField({
 
       <BottomSheet visible={open} onClose={() => setOpen(false)}>
         <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>{label}</Text>
-        <ScrollView style={styles.sheetList}>
+        <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
           {options.map(option => (
             <Pressable
               key={option}

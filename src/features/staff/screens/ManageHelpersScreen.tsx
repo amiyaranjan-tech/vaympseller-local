@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ChevronLeft, Plus, Trash2, UserRound } from 'lucide-react-native';
 
 import { Screen } from '../../../components/layout/Screen';
+import { FormScrollView } from '../../../components/layout/FormScrollView';
 import { Card } from '../../../components/common/Card';
 import { Badge } from '../../../components/common/Badge';
 import { Button } from '../../../components/common/Button';
@@ -86,7 +87,7 @@ export function ManageHelpersScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
+      <FormScrollView contentContainerStyle={styles.content}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backButton}>
           <ChevronLeft size={26} color={colors.textPrimary} />
         </Pressable>
@@ -139,7 +140,7 @@ export function ManageHelpersScreen() {
           onPress={() => setFormOpen(true)}
           style={styles.addButton}
         />
-      </ScrollView>
+      </FormScrollView>
 
       <BottomSheet visible={formOpen} onClose={() => setFormOpen(false)}>
         <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Add Helper</Text>

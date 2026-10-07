@@ -1,10 +1,11 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Screen } from '../../../components/layout/Screen';
+import { FormScrollView } from '../../../components/layout/FormScrollView';
 import { Button } from '../../../components/common/Button';
 import { FormTextInput } from '../../../components/forms/FormTextInput';
 import { useToast } from '../../../components/feedback/Toast';
@@ -51,9 +52,8 @@ export function LoginScreen({ navigation }: Props) {
 
   return (
     <Screen>
-      <ScrollView
+      <FormScrollView
         contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Brand */}
@@ -301,7 +301,7 @@ export function LoginScreen({ navigation }: Props) {
             Create your shop
           </Text>
         </View>
-      </ScrollView>
+      </FormScrollView>
     </Screen>
   );
 }
