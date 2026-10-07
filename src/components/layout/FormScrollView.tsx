@@ -1,17 +1,19 @@
 import React from 'react';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { ScrollView } from 'react-native';
 
-import { Spacing } from '../../theme/spacing';
-
-// Drop-in vertical ScrollView for screens with inputs — scrolls the focused
-// field above the keyboard (same settings RegisterScreen uses), and lets
-// taps on buttons/dropdowns land while the keyboard is open.
-export function FormScrollView(props: React.ComponentProps<typeof KeyboardAwareScrollView>) {
+// Vertical ScrollView for screens with inputs. Native keyboard handling
+// only — react-native-keyboard-aware-scroll-view reads TextInput.State
+// internals RN 0.86 removed ("cannot read property currentlyFocusedInput").
+// Android: windowSoftInputMode="adjustResize" (AndroidManifest) shrinks the
+// window and ScrollView keeps the focused field visible. iOS:
+// automaticallyAdjustKeyboardInsets does the same. Taps on buttons/
+// dropdowns land on the first press while the keyboard is open.
+export function FormScrollView(props: React.ComponentProps<typeof ScrollView>) {
   return (
-    <KeyboardAwareScrollView
+    <ScrollView
       keyboardShouldPersistTaps="handled"
-      enableOnAndroid
-      extraScrollHeight={Spacing.xxl}
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="on-drag"
       {...props}
     />
   );

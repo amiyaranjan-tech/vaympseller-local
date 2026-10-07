@@ -1,6 +1,5 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,6 +24,7 @@ import {
 } from 'lucide-react-native';
 
 import { Screen } from '../../../components/layout/Screen';
+import { FormScrollView } from '../../../components/layout/FormScrollView';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { StepProgressBar } from '../../../components/common/StepProgressBar';
@@ -140,12 +140,9 @@ export function RegisterScreen({ navigation }: Props) {
 
   return (
     <Screen>
-      <KeyboardAwareScrollView
+      <FormScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.content, styles.contentWithFixedBar]}
-        keyboardShouldPersistTaps="handled"
-        enableOnAndroid
-        extraScrollHeight={Spacing.xxl}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.topRow}>
@@ -382,7 +379,7 @@ export function RegisterScreen({ navigation }: Props) {
           </>
         )}
 
-      </KeyboardAwareScrollView>
+      </FormScrollView>
 
       <View
         style={[
