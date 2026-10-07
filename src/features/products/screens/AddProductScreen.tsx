@@ -1,16 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Check, ChevronDown, ChevronLeft, Plus, X } from 'lucide-react-native';
+import { ChevronDown, ChevronLeft, Plus, X } from 'lucide-react-native';
 
 import { Screen } from '../../../components/layout/Screen';
 import { FormScrollView } from '../../../components/layout/FormScrollView';
 import { Button } from '../../../components/common/Button';
 import { BottomSheet } from '../../../components/common/BottomSheet';
 import { ProductImagePicker, type PickerImage } from '../../../components/common/ProductImagePicker';
-import { FieldLabel, CountedInput, SelectField, FlagCheckbox } from '../../../components/forms/ProductFormFields';
+import { FieldLabel, CountedInput, SelectField, FlagCheckbox, OptionSheet } from '../../../components/forms/ProductFormFields';
 import { BrandSelectField } from '../../../components/forms/BrandSelectField';
 import { useThemeColors } from '../../../store/themeStore';
 import { useToast } from '../../../components/feedback/Toast';
@@ -50,17 +50,19 @@ interface VariantRow {
 
 const emptyVariant = (): VariantRow => ({ size: '', color: '', sku: '', stock: '' });
 
-// Compact size picker for a variant row — pick from the taxonomy's list,
-// same as the admin panel's per-row size Combobox.
+// Compact size picker for a variant row — searchable, and a new size can
+// be added, same as the admin panel's per-row size Combobox.
 function VariantSizePicker({
   value,
   options,
   onSelect,
+  onCreate,
   colors,
 }: {
   value: string;
   options: string[];
   onSelect: (value: string) => void;
+  onCreate?: (value: string) => Promise<unknown>;
   colors: Colors;
 }) {
   const [open, setOpen] = useState(false);
@@ -80,24 +82,16 @@ function VariantSizePicker({
         <ChevronDown size={16} color={colors.textLight} />
       </Pressable>
 
-      <BottomSheet visible={open} onClose={() => setOpen(false)}>
-        <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Size</Text>
-        <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
-          {options.map(option => (
-            <Pressable
-              key={option}
-              onPress={() => {
-                onSelect(option);
-                setOpen(false);
-              }}
-              style={[styles.sheetRow, { borderBottomColor: colors.divider }]}
-            >
-              <Text style={[styles.sheetRowLabel, { color: colors.textPrimary }]}>{option}</Text>
-              {value === option && <Check size={18} color={colors.accent} />}
-            </Pressable>
-          ))}
-        </ScrollView>
-      </BottomSheet>
+      <OptionSheet
+        visible={open}
+        onClose={() => setOpen(false)}
+        title="Size"
+        value={value}
+        options={options}
+        onSelect={onSelect}
+        onCreate={onCreate}
+        colors={colors}
+      />
     </>
   );
 }
@@ -188,6 +182,10 @@ export function AddProductScreen() {
     sizeOptions,
     brandOptions,
     refreshBrands,
+    addSubcategory,
+    addSize,
+    addColor,
+    addSeason,
   } = useProductTaxonomy(gender.toLowerCase(), category, subcategory);
 
   // The shop's running store-wide deals — the Offers step asks whether
@@ -218,6 +216,21 @@ export function AddProductScreen() {
       navigation.goBack();
     },
   });
+
+  // Wraps an add-option call so a failure shows a toast (and rethrows so
+  // the sheet stays open).
+  const withToast = (add: (value: string) => Promise<unknown>) => async (value: string) => {
+    try {
+      await add(value);
+    } catch (error) {
+      toast.show({
+        type: 'error',
+        title: `Couldn't add "${value}"`,
+        message: error instanceof Error ? error.message : undefined,
+      });
+      throw error;
+    }
+  };
 
   const setGenderAndReset = (value: string) => {
     setGender(value);
@@ -458,6 +471,7 @@ export function AddProductScreen() {
                   value={subcategory}
                   options={subcategoryOptions}
                   onSelect={setSubcategory}
+                  onCreate={gender && category ? withToast(addSubcategory) : undefined}
                   colors={colors}
                 />
               </View>
@@ -508,6 +522,7 @@ export function AddProductScreen() {
                   value={variant.size}
                   options={sizeOptions}
                   onSelect={size => updateVariant(index, { size })}
+                  onCreate={subcategory ? withToast(addSize) : undefined}
                   colors={colors}
                 />
                 <TextInput
@@ -549,10 +564,10 @@ export function AddProductScreen() {
           <View style={styles.fields}>
             <View style={styles.row}>
               <View style={styles.col}>
-                <SelectField label="Color" placeholder="Select" value={color} options={colorOptions} onSelect={setColor} colors={colors} />
+                <SelectField label="Color" placeholder="Select" value={color} options={colorOptions} onSelect={setColor} onCreate={withToast(addColor)} colors={colors} />
               </View>
               <View style={styles.col}>
-                <SelectField label="Season" placeholder="Select" value={season} options={seasonOptions} onSelect={setSeason} colors={colors} />
+                <SelectField label="Season" placeholder="Select" value={season} options={seasonOptions} onSelect={setSeason} onCreate={withToast(addSeason)} colors={colors} />
               </View>
             </View>
 
@@ -900,18 +915,12 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.semibold,
     marginBottom: Spacing.md,
   },
-  sheetList: {
-    maxHeight: 360,
-  },
   sheetRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: Spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  sheetRowLabel: {
-    fontSize: FontSize.md,
   },
   sheetField: {
     marginBottom: Spacing.md,

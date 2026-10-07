@@ -38,6 +38,17 @@ export function getOptions(field: string, scope?: string): Promise<string[]> {
   });
 }
 
+// Add a subcategory/size/color/season value — same as the admin form's
+// create-able pickers. `scope`: "gender::category" for subcategory, the
+// subcategory for size. Upserts case-insensitively server-side.
+export function createOption(field: string, value: string, scope?: string): Promise<unknown> {
+  return request<unknown>({
+    url: ENDPOINTS.sellerTaxonomy.options,
+    method: 'POST',
+    data: { field, value, scope },
+  });
+}
+
 export interface Brand {
   value: string;
   image: UploadedImage;

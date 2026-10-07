@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Check, ChevronDown, Info } from 'lucide-react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Check, ChevronDown, Info, Plus, Search } from 'lucide-react-native';
 
 import { BottomSheet } from '../common/BottomSheet';
 import { useThemeColors } from '../../store/themeStore';
@@ -103,6 +103,105 @@ export function CountedInput({
   );
 }
 
+// Option list in a bottom sheet — searchable, and with `onCreate` an
+// "Add" row for a value that isn't in the list yet (same as the admin
+// form's create-able Comboboxes). Shared by SelectField and
+// AddProductScreen's per-variant size picker.
+export function OptionSheet({
+  visible,
+  onClose,
+  title,
+  value,
+  options,
+  onSelect,
+  onCreate,
+  colors,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  value: string;
+  options: string[];
+  onSelect: (value: string) => void;
+  onCreate?: (value: string) => Promise<unknown>;
+  colors: Colors;
+}) {
+  const [query, setQuery] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  const q = query.trim();
+  const filtered = q ? options.filter(o => o.toLowerCase().includes(q.toLowerCase())) : options;
+  const canCreate = !!onCreate && !!q && !options.some(o => o.toLowerCase() === q.toLowerCase());
+  const showSearch = !!onCreate || options.length > 8;
+
+  const close = () => {
+    setQuery('');
+    onClose();
+  };
+
+  const pick = (option: string) => {
+    onSelect(option);
+    close();
+  };
+
+  const create = async () => {
+    if (!onCreate) return;
+    setCreating(true);
+    try {
+      await onCreate(q);
+      pick(q);
+    } catch {
+      // The caller's onCreate shows its own error.
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <BottomSheet visible={visible} onClose={close}>
+      <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>{title}</Text>
+      {showSearch && (
+        <View style={[styles.searchField, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+          <Search size={16} color={colors.textLight} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={onCreate ? 'Search or add new' : 'Search'}
+            placeholderTextColor={colors.inputPlaceholder}
+            style={[styles.searchInput, { color: colors.textPrimary }]}
+            autoCorrect={false}
+          />
+        </View>
+      )}
+      <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
+        {canCreate && (
+          <Pressable onPress={create} disabled={creating} style={styles.sheetRow}>
+            <View style={styles.addRow}>
+              {creating ? (
+                <ActivityIndicator size="small" color={colors.accent} />
+              ) : (
+                <Plus size={18} color={colors.accent} />
+              )}
+              <Text style={[styles.sheetRowLabel, { color: colors.accent }]}>Add "{q}"</Text>
+            </View>
+          </Pressable>
+        )}
+        {filtered.map(option => (
+          <Pressable key={option} onPress={() => pick(option)} style={styles.sheetRow}>
+            <Text style={[styles.sheetRowLabel, { color: colors.textPrimary }]}>{option}</Text>
+            {value === option && <Check size={18} color={colors.accent} />}
+          </Pressable>
+        ))}
+        {filtered.length === 0 && !canCreate && (
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {options.length === 0 ? 'Nothing to choose yet' : 'No matches'}
+          </Text>
+        )}
+      </ScrollView>
+    </BottomSheet>
+  );
+}
+
 export function SelectField({
   label,
   required,
@@ -110,6 +209,7 @@ export function SelectField({
   value,
   options,
   onSelect,
+  onCreate,
   colors,
 }: {
   label: string;
@@ -118,6 +218,7 @@ export function SelectField({
   value: string;
   options: string[];
   onSelect: (value: string) => void;
+  onCreate?: (value: string) => Promise<unknown>;
   colors: Colors;
 }) {
   const [open, setOpen] = useState(false);
@@ -144,24 +245,16 @@ export function SelectField({
         <ChevronDown size={18} color={colors.textLight} />
       </Pressable>
 
-      <BottomSheet visible={open} onClose={() => setOpen(false)}>
-        <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>{label}</Text>
-        <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
-          {options.map(option => (
-            <Pressable
-              key={option}
-              onPress={() => {
-                onSelect(option);
-                setOpen(false);
-              }}
-              style={styles.sheetRow}
-            >
-              <Text style={[styles.sheetRowLabel, { color: colors.textPrimary }]}>{option}</Text>
-              {value === option && <Check size={18} color={colors.accent} />}
-            </Pressable>
-          ))}
-        </ScrollView>
-      </BottomSheet>
+      <OptionSheet
+        visible={open}
+        onClose={() => setOpen(false)}
+        title={label}
+        value={value}
+        options={options}
+        onSelect={onSelect}
+        onCreate={onCreate}
+        colors={colors}
+      />
     </View>
   );
 }
@@ -291,6 +384,30 @@ const styles = StyleSheet.create({
   },
   sheetList: {
     maxHeight: 360,
+  },
+  searchField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    fontSize: FontSize.md,
+  },
+  addRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  emptyText: {
+    paddingVertical: Spacing.lg,
+    textAlign: 'center',
+    fontSize: FontSize.sm,
   },
   sheetRow: {
     flexDirection: 'row',

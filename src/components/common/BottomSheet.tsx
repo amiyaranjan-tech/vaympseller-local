@@ -88,9 +88,14 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
         {...panResponder.panHandlers}
       >
         <View style={[styles.handle, { backgroundColor: colors.sheetHandle }]} />
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          {children}
-        </KeyboardAvoidingView>
+        {/* iOS only — on Android, behavior="height" froze the sheet at a
+            stale height when the keyboard closed (dropdown options vanished);
+            adjustResize already lifts the sheet above the keyboard there. */}
+        {Platform.OS === 'ios' ? (
+          <KeyboardAvoidingView behavior="padding">{children}</KeyboardAvoidingView>
+        ) : (
+          children
+        )}
       </Animated.View>
     </Modal>
   );

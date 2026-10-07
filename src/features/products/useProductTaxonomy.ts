@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { getGenders, getCategories, getSubcategories, getOptions } from './taxonomy.api';
+import { getGenders, getCategories, getSubcategories, getOptions, createOption } from './taxonomy.api';
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
@@ -61,5 +61,22 @@ export function useProductTaxonomy(gender: string, category: string, subcategory
     // A freshly-created brand should show up in the picker immediately,
     // without waiting on this hook's own re-render/refetch cycle.
     refreshBrands: () => queryClient.invalidateQueries({ queryKey: ['taxonomy', 'options', 'brand'] }),
+    // Add a new value (like the admin form), then refresh that list.
+    addSubcategory: (value: string) =>
+      createOption('subcategory', value, `${gender}::${category}`).then(() =>
+        queryClient.invalidateQueries({ queryKey: ['taxonomy', 'subcategories'] }),
+      ),
+    addSize: (value: string) =>
+      createOption('size', value, subcategory).then(() =>
+        queryClient.invalidateQueries({ queryKey: ['taxonomy', 'options', 'size'] }),
+      ),
+    addColor: (value: string) =>
+      createOption('color', value).then(() =>
+        queryClient.invalidateQueries({ queryKey: ['taxonomy', 'options', 'color'] }),
+      ),
+    addSeason: (value: string) =>
+      createOption('season', value).then(() =>
+        queryClient.invalidateQueries({ queryKey: ['taxonomy', 'options', 'season'] }),
+      ),
   };
 }
