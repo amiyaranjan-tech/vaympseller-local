@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Info, Plus, Trash2, X } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronLeft, Plus, X } from 'lucide-react-native';
 
 import { Screen } from '../../../components/layout/Screen';
 import { FormScrollView } from '../../../components/layout/FormScrollView';
-import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { BottomSheet } from '../../../components/common/BottomSheet';
 import { ProductImagePicker, type PickerImage } from '../../../components/common/ProductImagePicker';
@@ -19,16 +18,26 @@ import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import type { MainStackParamList } from '../../../navigation/routeConfig';
 import { createProduct, type ProductGender, type ProductPayload, type ProductVariant } from '../products.api';
+import { getOffers } from '../../deals/offers.api';
 import { useProductTaxonomy } from '../useProductTaxonomy';
 import { PricingBreakdown, discountedPrice } from '../PricingBreakdown';
+
+type Colors = ReturnType<typeof useThemeColors>['colors'];
 
 // Mirrors the admin panel's own product wizard (src/pages/products/
 // ProductForm.tsx) step-for-step — Basics/Pricing/Inventory/Attributes/
 // Offers/Media — so a seller's flow matches what an admin sees when
-// editing the same product. Notably: there is no "Simple vs Variable
-// product type" concept anywhere in the real system (every product is
-// just a name + a variants[] array), so that toggle doesn't exist here.
-const STEPS = ['Basics', 'Pricing', 'Inventory', 'Attributes', 'Offers', 'Media'];
+// editing the same product.
+const STEPS = [
+  { label: 'Basics', hint: 'Name it and place it in the catalog.' },
+  { label: 'Pricing', hint: 'Set the MRP and your discount.' },
+  { label: 'Inventory', hint: 'Sizes and how many you have of each.' },
+  { label: 'Attributes', hint: 'Details shoppers filter by.' },
+  { label: 'Offers', hint: 'Highlights, returns and deals.' },
+  { label: 'Media', hint: 'Photos sell — add a few good ones.' },
+];
+
+const MAX_IMAGES = 8;
 
 type AddProductNav = NativeStackNavigationProp<MainStackParamList, 'AddProduct'>;
 
@@ -41,10 +50,8 @@ interface VariantRow {
 
 const emptyVariant = (): VariantRow => ({ size: '', color: '', sku: '', stock: '' });
 
-// Compact size picker for a variant row — same "pick from a list, don't
-// type it" behavior as the admin panel's per-row size Combobox
-// (ProductForm.tsx), just without its "create a new size" affordance
-// (that's an admin-only taxonomy-management action, not a seller one).
+// Compact size picker for a variant row — pick from the taxonomy's list,
+// same as the admin panel's per-row size Combobox.
 function VariantSizePicker({
   value,
   options,
@@ -54,7 +61,7 @@ function VariantSizePicker({
   value: string;
   options: string[];
   onSelect: (value: string) => void;
-  colors: ReturnType<typeof useThemeColors>['colors'];
+  colors: Colors;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -62,14 +69,10 @@ function VariantSizePicker({
     <>
       <Pressable
         onPress={() => setOpen(true)}
-        style={[
-          styles.variantSizeInput,
-          styles.variantSizePicker,
-          { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
-        ]}
+        style={[styles.sizeField, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
       >
         <Text
-          style={[styles.variantSizeValue, { color: value ? colors.textPrimary : colors.inputPlaceholder }]}
+          style={[styles.sizeValue, { color: value ? colors.textPrimary : colors.inputPlaceholder }]}
           numberOfLines={1}
         >
           {value || 'Size'}
@@ -79,7 +82,7 @@ function VariantSizePicker({
 
       <BottomSheet visible={open} onClose={() => setOpen(false)}>
         <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Size</Text>
-        <ScrollView style={styles.sizeSheetList} keyboardShouldPersistTaps="handled">
+        <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
           {options.map(option => (
             <Pressable
               key={option}
@@ -87,9 +90,9 @@ function VariantSizePicker({
                 onSelect(option);
                 setOpen(false);
               }}
-              style={styles.sizeSheetRow}
+              style={[styles.sheetRow, { borderBottomColor: colors.divider }]}
             >
-              <Text style={[styles.sizeSheetRowLabel, { color: colors.textPrimary }]}>{option}</Text>
+              <Text style={[styles.sheetRowLabel, { color: colors.textPrimary }]}>{option}</Text>
               {value === option && <Check size={18} color={colors.accent} />}
             </Pressable>
           ))}
@@ -97,6 +100,35 @@ function VariantSizePicker({
       </BottomSheet>
     </>
   );
+}
+
+function PlainInput({
+  value,
+  onChangeText,
+  placeholder,
+  colors,
+}: {
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder: string;
+  colors: Colors;
+}) {
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor={colors.inputPlaceholder}
+      style={[
+        styles.plainInput,
+        { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary },
+      ]}
+    />
+  );
+}
+
+function ErrorText({ children, colors }: { children: string; colors: Colors }) {
+  return <Text style={[styles.errorText, { color: colors.error }]}>{children}</Text>;
 }
 
 export function AddProductScreen() {
@@ -115,10 +147,10 @@ export function AddProductScreen() {
   const [subcategory, setSubcategory] = useState('');
   const [tags, setTags] = useState('');
 
-  // Pricing — mirrors the admin ProductForm: the seller types MRP and their
-  // discount %; the rest is a read-only breakdown (see PricingBreakdown).
-  const [sellingPrice, setSellingPrice] = useState('2000');
-  const [discountPercent, setDiscountPercent] = useState('55');
+  // Pricing — the seller types MRP and their discount %; the rest is a
+  // read-only breakdown (see PricingBreakdown).
+  const [sellingPrice, setSellingPrice] = useState('');
+  const [discountPercent, setDiscountPercent] = useState('');
 
   // Inventory
   const [variants, setVariants] = useState<VariantRow[]>([emptyVariant()]);
@@ -131,12 +163,13 @@ export function AddProductScreen() {
   const [attrKey, setAttrKey] = useState('');
   const [attrValue, setAttrValue] = useState('');
 
-  // Offers (flags)
+  // Offers
   const [isFeatured, setIsFeatured] = useState(false);
   const [isTrending, setIsTrending] = useState(false);
   const [isNewArrival, setIsNewArrival] = useState(false);
   const [isLimitedStock, setIsLimitedStock] = useState(false);
   const [isReturnable, setIsReturnable] = useState(true);
+  const [excludeFromShopDeals, setExcludeFromShopDeals] = useState(false);
   // Try & Buy is derived server-side from isReturnable; Inner Wear is never returnable.
   const isInnerWear = category === 'Inner Wear';
 
@@ -156,6 +189,24 @@ export function AddProductScreen() {
     brandOptions,
     refreshBrands,
   } = useProductTaxonomy(gender.toLowerCase(), category, subcategory);
+
+  // The shop's running store-wide deals — the Offers step asks whether
+  // this product takes part in them (same as the admin form).
+  const offersQuery = useQuery({
+    queryKey: ['seller-offers', 'store-wide'],
+    queryFn: () => getOffers({ limit: 50 }),
+  });
+  const shopDeals = useMemo(() => {
+    const now = Date.now();
+    return (offersQuery.data?.items ?? []).filter(
+      o =>
+        o.scope === 'entire_shop' &&
+        o.isEnabled &&
+        (!o.startDate || new Date(o.startDate).getTime() <= now) &&
+        (!o.endDate || new Date(o.endDate).getTime() >= now),
+    );
+  }, [offersQuery.data]);
+  const includeLabel = `Include in ${shopDeals.map(o => o.title).join(', ')}`;
 
   const createMutation = useMutation({
     mutationFn: (payload: ProductPayload) => createProduct(payload),
@@ -216,8 +267,23 @@ export function AddProductScreen() {
     }
   };
 
-  // Matches the admin panel's own addVariant — defaults the new row to
-  // the first size not already used by another row, same as ProductForm.tsx.
+  // Jumping ahead still validates every step in between.
+  const goToStep = (target: number) => {
+    if (target <= step) {
+      setStep(target);
+      return;
+    }
+    for (let i = step; i < target; i++) {
+      if (!validateStep(i)) {
+        setStep(i);
+        return;
+      }
+    }
+    setStep(target);
+  };
+
+  // Defaults the new row to the first size not already used by another
+  // row, same as the admin form's addVariant.
   const addVariant = () =>
     setVariants(prev => {
       const nextSize = sizeOptions.find(
@@ -225,10 +291,10 @@ export function AddProductScreen() {
       );
       return [...prev, { ...emptyVariant(), size: nextSize ?? '' }];
     });
-  const removeVariant = (index: number) =>
-    setVariants(prev => prev.filter((_, i) => i !== index));
+  const removeVariant = (index: number) => setVariants(prev => prev.filter((_, i) => i !== index));
   const updateVariant = (index: number, patch: Partial<VariantRow>) =>
     setVariants(prev => prev.map((v, i) => (i === index ? { ...v, ...patch } : v)));
+  const totalStock = variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
 
   const addAttribute = () => {
     if (!attrKey.trim() || !attrValue.trim()) return;
@@ -247,9 +313,12 @@ export function AddProductScreen() {
   };
 
   const handleSubmit = () => {
-    if (!validateStep(0) || !validateStep(1) || !validateStep(2)) {
-      toast.show({ type: 'error', title: 'Some required fields are missing — check earlier steps' });
-      return;
+    for (const i of [0, 1, 2]) {
+      if (!validateStep(i)) {
+        setStep(i);
+        toast.show({ type: 'error', title: 'Some required fields are missing' });
+        return;
+      }
     }
 
     const payloadVariants: ProductVariant[] = variants
@@ -280,386 +349,358 @@ export function AddProductScreen() {
       isNewArrival,
       isLimitedStock,
       isReturnable: isReturnable && !isInnerWear,
+      excludeFromShopDeals: shopDeals.length > 0 && excludeFromShopDeals,
       images,
       video: video.trim() || undefined,
     });
   };
 
+  const isLast = step === STEPS.length - 1;
+
   return (
-    <Screen>
-      <FormScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Pressable
-            onPress={goBack}
-            hitSlop={12}
-            style={[styles.backButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-          >
-            <ChevronLeft size={22} color={colors.textPrimary} />
-          </Pressable>
-          <View style={styles.headerText}>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>Add Product</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              {STEPS.length} focused steps to publish a listing
-            </Text>
-          </View>
-          <View style={styles.backButton} />
+    // Bottom edge too — the footer is pinned to the bottom of the screen.
+    <Screen edges={['top', 'left', 'right', 'bottom']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable onPress={goBack} hitSlop={12} style={styles.headerIcon}>
+          <ChevronLeft size={24} color={colors.textPrimary} />
+        </Pressable>
+        <View style={styles.headerText}>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>New product</Text>
+          <Text style={[styles.headerMeta, { color: colors.textSecondary }]}>
+            Step {step + 1} of {STEPS.length}
+          </Text>
         </View>
+        <View style={styles.headerIcon} />
+      </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stepper}>
-          {STEPS.map((label, index) => {
-            const isActive = index === step;
-            const isDone = index < step;
-            return (
-              <Pressable
-                key={label}
-                onPress={() => setStep(index)}
-                style={[
-                  styles.stepPill,
-                  {
-                    borderColor: isActive ? colors.accent : isDone ? `${colors.accent}40` : colors.border,
-                    backgroundColor: isActive ? colors.accent : isDone ? colors.accent10 : 'transparent',
-                  },
-                ]}
-              >
-                {isDone ? (
-                  <Check size={13} color={colors.accent} />
-                ) : (
-                  <View
-                    style={[
-                      styles.stepPillNumber,
-                      { backgroundColor: isActive ? colors.textInverse : colors.border },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.stepPillNumberLabel,
-                        { color: isActive ? colors.accent : colors.textSecondary },
-                      ]}
-                    >
-                      {index + 1}
-                    </Text>
-                  </View>
-                )}
-                <Text
-                  style={[
-                    styles.stepPillLabel,
-                    { color: isActive ? colors.textInverse : isDone ? colors.accent : colors.textSecondary },
-                  ]}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+      {/* Progress — one segment per step, tappable */}
+      <View style={styles.progress}>
+        {STEPS.map((s, i) => (
+          <Pressable key={s.label} onPress={() => goToStep(i)} hitSlop={8} style={styles.progressItem}>
+            <View
+              style={[
+                styles.progressBar,
+                { backgroundColor: i <= step ? colors.accent : colors.border },
+              ]}
+            />
+            <Text
+              style={[
+                styles.progressLabel,
+                {
+                  color: i === step ? colors.textPrimary : colors.textLight,
+                  fontWeight: i === step ? FontWeight.semibold : FontWeight.regular,
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {s.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
 
-        <Card style={styles.section}>
-          {step === 0 && (
-            <>
-              <FieldLabel label="Product Name" required colors={colors} />
-              <CountedInput value={name} onChangeText={setName} placeholder="Enter product name" maxLength={120} colors={colors} />
-              {errors.name && <Text style={[styles.errorText, { color: colors.error }]}>Product name is required</Text>}
+      <FormScrollView contentContainerStyle={styles.content}>
+        <Text style={[styles.stepTitle, { color: colors.textPrimary }]}>{STEPS[step].label}</Text>
+        <Text style={[styles.stepHint, { color: colors.textSecondary }]}>{STEPS[step].hint}</Text>
 
+        {step === 0 && (
+          <View style={styles.fields}>
+            <View>
+              <FieldLabel label="Product name" required colors={colors} />
+              <CountedInput value={name} onChangeText={setName} placeholder="e.g. Linen relaxed shirt" maxLength={120} colors={colors} />
+              {errors.name && <ErrorText colors={colors}>Product name is required</ErrorText>}
+            </View>
+
+            <View>
               <FieldLabel label="Description" required colors={colors} />
               <CountedInput
                 value={description}
                 onChangeText={setDescription}
-                placeholder="Describe your product in detail"
+                placeholder="Fabric, fit, care — what a shopper should know"
                 maxLength={2000}
                 multiline
                 colors={colors}
               />
-              {errors.description && (
-                <Text style={[styles.errorText, { color: colors.error }]}>Description is required</Text>
-              )}
+              {errors.description && <ErrorText colors={colors}>Description is required</ErrorText>}
+            </View>
 
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <SelectField
-                    label="Gender"
-                    required
-                    placeholder="Select gender"
-                    value={gender}
-                    options={genderOptions}
-                    onSelect={setGenderAndReset}
-                    colors={colors}
-                  />
-                </View>
-                <View style={styles.col}>
-                  <BrandSelectField
-                    value={brand}
-                    options={brandOptions}
-                    onSelect={setBrand}
-                    onBrandAdded={refreshBrands}
-                  />
-                </View>
-              </View>
-              {errors.gender && <Text style={[styles.errorText, { color: colors.error }]}>Gender is required</Text>}
+            <View>
+              <SelectField
+                label="Gender"
+                required
+                placeholder="Select gender"
+                value={gender}
+                options={genderOptions}
+                onSelect={setGenderAndReset}
+                colors={colors}
+              />
+              {errors.gender && <ErrorText colors={colors}>Gender is required</ErrorText>}
+            </View>
 
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <SelectField
-                    label="Category"
-                    required
-                    placeholder={gender ? 'Select category' : 'Select gender first'}
-                    value={category}
-                    options={categoryOptions}
-                    onSelect={setCategoryAndReset}
-                    colors={colors}
-                  />
-                </View>
-                <View style={styles.col}>
-                  <SelectField
-                    label="Subcategory"
-                    required
-                    placeholder={category ? 'Select subcategory' : 'Select category first'}
-                    value={subcategory}
-                    options={subcategoryOptions}
-                    onSelect={setSubcategory}
-                    colors={colors}
-                  />
-                </View>
-              </View>
-              {(errors.category || errors.subcategory) && (
-                <Text style={[styles.errorText, { color: colors.error }]}>
-                  Category and subcategory are required
-                </Text>
-              )}
-
-              <FieldLabel label="Tags" colors={colors} />
-              <View style={[styles.tagsField, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-                <TextInput
-                  value={tags}
-                  onChangeText={setTags}
-                  placeholder="Add tags (e.g. casual, summer)"
-                  placeholderTextColor={colors.inputPlaceholder}
-                  style={[styles.tagsInput, { color: colors.textPrimary }]}
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <SelectField
+                  label="Category"
+                  required
+                  placeholder={gender ? 'Select' : 'Gender first'}
+                  value={category}
+                  options={categoryOptions}
+                  onSelect={setCategoryAndReset}
+                  colors={colors}
                 />
               </View>
-            </>
-          )}
-
-          {step === 1 && (
-            <>
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Pricing</Text>
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <FieldLabel label="MRP (Selling Price)" required colors={colors} />
-                  <CountedInput value={sellingPrice} onChangeText={setSellingPrice} placeholder="0" maxLength={10} keyboardType="number-pad" colors={colors} />
-                </View>
-                <View style={styles.col}>
-                  <FieldLabel label="Discount %" required colors={colors} />
-                  <CountedInput value={discountPercent} onChangeText={setDiscountPercent} placeholder="0" maxLength={3} keyboardType="number-pad" colors={colors} />
-                </View>
+              <View style={styles.col}>
+                <SelectField
+                  label="Subcategory"
+                  required
+                  placeholder={category ? 'Select' : 'Category first'}
+                  value={subcategory}
+                  options={subcategoryOptions}
+                  onSelect={setSubcategory}
+                  colors={colors}
+                />
               </View>
-              {(errors.sellingPrice || errors.discountPercent) && (
-                <Text style={[styles.errorText, { color: colors.error }]}>
-                  Enter an MRP and a discount between 0 and 100%
-                </Text>
-              )}
+            </View>
+            {(errors.category || errors.subcategory) && (
+              <ErrorText colors={colors}>Category and subcategory are required</ErrorText>
+            )}
 
-              <PricingBreakdown mrp={sellingPrice} discountPercent={discountPercent} colors={colors} />
-            </>
-          )}
+            <BrandSelectField value={brand} options={brandOptions} onSelect={setBrand} onBrandAdded={refreshBrands} />
 
-          {step === 2 && (
-            <>
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Variants (size, stock)</Text>
-              {variants.map((variant, index) => (
-                <View key={index} style={styles.variantRow}>
-                  <VariantSizePicker
-                    value={variant.size}
-                    options={sizeOptions}
-                    onSelect={size => updateVariant(index, { size })}
-                    colors={colors}
-                  />
-                  <TextInput
-                    value={variant.stock}
-                    onChangeText={text => updateVariant(index, { stock: text })}
-                    placeholder="Stock"
-                    keyboardType="number-pad"
-                    placeholderTextColor={colors.inputPlaceholder}
-                    style={[
-                      styles.variantStockInput,
-                      { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary },
-                    ]}
-                  />
-                  <Pressable onPress={() => removeVariant(index)} hitSlop={8} style={styles.variantRemove}>
-                    <Trash2 size={18} color={colors.error} />
-                  </Pressable>
-                </View>
-              ))}
-              {errors.variants && (
-                <Text style={[styles.errorText, { color: colors.error }]}>
-                  Add at least one variant with a size
-                </Text>
-              )}
-              <Pressable onPress={addVariant} style={[styles.addVariantButton, { borderColor: colors.accent }]}>
-                <Plus size={16} color={colors.accent} />
-                <Text style={[styles.addVariantLabel, { color: colors.accent }]}>Add variant</Text>
-              </Pressable>
-            </>
-          )}
+            <View>
+              <FieldLabel label="Tags" colors={colors} />
+              <PlainInput value={tags} onChangeText={setTags} placeholder="casual, summer, cotton" colors={colors} />
+            </View>
+          </View>
+        )}
 
-          {step === 3 && (
-            <>
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Attributes</Text>
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <SelectField label="Color" placeholder="Select color" value={color} options={colorOptions} onSelect={setColor} colors={colors} />
-                </View>
-                <View style={styles.col}>
-                  <SelectField label="Season" placeholder="Select season" value={season} options={seasonOptions} onSelect={setSeason} colors={colors} />
-                </View>
+        {step === 1 && (
+          <View style={styles.fields}>
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <FieldLabel label="MRP (Selling Price)" required colors={colors} />
+                <CountedInput value={sellingPrice} onChangeText={setSellingPrice} placeholder="₹ 0" maxLength={10} keyboardType="number-pad" colors={colors} />
               </View>
+              <View style={styles.col}>
+                <FieldLabel label="Discount %" required colors={colors} />
+                <CountedInput value={discountPercent} onChangeText={setDiscountPercent} placeholder="0" maxLength={3} keyboardType="number-pad" colors={colors} />
+              </View>
+            </View>
+            {(errors.sellingPrice || errors.discountPercent) && (
+              <ErrorText colors={colors}>Enter an MRP and a discount between 0 and 100%</ErrorText>
+            )}
 
-              <FieldLabel label="Attributes" colors={colors} />
-              <Pressable
-                onPress={() => setAttributeSheetOpen(true)}
-                style={[styles.addAttributesButton, { borderColor: colors.accent }]}
-              >
-                <Plus size={16} color={colors.accent} />
-                <Text style={[styles.addAttributesLabel, { color: colors.accent }]}>Add Attributes</Text>
-              </Pressable>
+            <PricingBreakdown mrp={sellingPrice} discountPercent={discountPercent} colors={colors} />
+          </View>
+        )}
+
+        {step === 2 && (
+          <View style={styles.fields}>
+            <View style={styles.listHeader}>
+              <Text style={[styles.listHeaderLabel, { color: colors.textSecondary }]}>SIZE</Text>
+              <Text style={[styles.listHeaderLabel, styles.listHeaderStock, { color: colors.textSecondary }]}>STOCK</Text>
+            </View>
+
+            {variants.map((variant, index) => (
+              <View key={index} style={styles.variantRow}>
+                <VariantSizePicker
+                  value={variant.size}
+                  options={sizeOptions}
+                  onSelect={size => updateVariant(index, { size })}
+                  colors={colors}
+                />
+                <TextInput
+                  value={variant.stock}
+                  onChangeText={text => updateVariant(index, { stock: text })}
+                  placeholder="0"
+                  keyboardType="number-pad"
+                  placeholderTextColor={colors.inputPlaceholder}
+                  style={[
+                    styles.stockInput,
+                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary },
+                  ]}
+                />
+                <Pressable
+                  onPress={() => removeVariant(index)}
+                  hitSlop={8}
+                  disabled={variants.length === 1}
+                  style={[styles.variantRemove, variants.length === 1 && styles.disabled]}
+                >
+                  <X size={18} color={colors.textSecondary} />
+                </Pressable>
+              </View>
+            ))}
+            {errors.variants && <ErrorText colors={colors}>Add at least one size</ErrorText>}
+
+            <Pressable onPress={addVariant} style={styles.textAction}>
+              <Plus size={16} color={colors.accent} />
+              <Text style={[styles.textActionLabel, { color: colors.accent }]}>Add size</Text>
+            </Pressable>
+
+            <View style={[styles.summaryRow, { borderTopColor: colors.divider }]}>
+              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Total stock</Text>
+              <Text style={[styles.summaryValue, { color: colors.textPrimary }]}>{totalStock}</Text>
+            </View>
+          </View>
+        )}
+
+        {step === 3 && (
+          <View style={styles.fields}>
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <SelectField label="Color" placeholder="Select" value={color} options={colorOptions} onSelect={setColor} colors={colors} />
+              </View>
+              <View style={styles.col}>
+                <SelectField label="Season" placeholder="Select" value={season} options={seasonOptions} onSelect={setSeason} colors={colors} />
+              </View>
+            </View>
+
+            <View>
+              <FieldLabel label="More details" colors={colors} />
               {Object.keys(attributes).length > 0 && (
                 <View style={styles.chipRow}>
                   {Object.entries(attributes).map(([key, val]) => (
-                    <View key={key} style={[styles.chip, { backgroundColor: colors.accent10, borderColor: colors.accent }]}>
-                      <Text style={[styles.chipLabel, { color: colors.accent }]}>{key}: {val}</Text>
+                    <View key={key} style={[styles.chip, { borderColor: colors.border }]}>
+                      <Text style={[styles.chipLabel, { color: colors.textPrimary }]}>
+                        <Text style={{ color: colors.textSecondary }}>{key} </Text>
+                        {val}
+                      </Text>
                       <Pressable onPress={() => removeAttribute(key)} hitSlop={6}>
-                        <X size={14} color={colors.accent} />
+                        <X size={14} color={colors.textSecondary} />
                       </Pressable>
                     </View>
                   ))}
                 </View>
               )}
-            </>
-          )}
+              <Pressable onPress={() => setAttributeSheetOpen(true)} style={styles.textAction}>
+                <Plus size={16} color={colors.accent} />
+                <Text style={[styles.textActionLabel, { color: colors.accent }]}>Add detail</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
 
-          {step === 4 && (
-            <>
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Offers &amp; Highlights</Text>
+        {step === 4 && (
+          <View style={styles.fields}>
+            <View>
+              <Text style={[styles.groupLabel, { color: colors.textSecondary }]}>HIGHLIGHTS</Text>
               <FlagCheckbox title="Featured" description="Show in featured collections" checked={isFeatured} onToggle={() => setIsFeatured(v => !v)} colors={colors} />
               <FlagCheckbox title="Trending" description="Show in trending collections" checked={isTrending} onToggle={() => setIsTrending(v => !v)} colors={colors} />
-              <FlagCheckbox title="New Arrival" description="Show in the new arrivals shelf" checked={isNewArrival} onToggle={() => setIsNewArrival(v => !v)} colors={colors} />
-              <FlagCheckbox title="Limited Stock" description="Show a limited-stock urgency badge" checked={isLimitedStock} onToggle={() => setIsLimitedStock(v => !v)} colors={colors} />
+              <FlagCheckbox title="New arrival" description="Show on the new arrivals shelf" checked={isNewArrival} onToggle={() => setIsNewArrival(v => !v)} colors={colors} />
+              <FlagCheckbox title="Limited stock" description="Show a limited-stock badge" checked={isLimitedStock} onToggle={() => setIsLimitedStock(v => !v)} colors={colors} />
+            </View>
 
-              <View style={[styles.divider, { backgroundColor: colors.divider }]} />
-
+            <View>
+              <Text style={[styles.groupLabel, { color: colors.textSecondary }]}>RETURNS</Text>
               <FlagCheckbox
                 title="Returnable"
-                description="Customers can return this product"
+                description={
+                  isInnerWear
+                    ? "Inner Wear is always non-returnable, so it isn't Try & Buy."
+                    : isReturnable
+                      ? 'Returnable products are automatically Try & Buy.'
+                      : "Non-returnable products aren't eligible for Try & Buy."
+                }
                 checked={isReturnable && !isInnerWear}
                 disabled={isInnerWear}
                 onToggle={() => setIsReturnable(v => !v)}
                 colors={colors}
               />
-              <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-                {isInnerWear
-                  ? "Inner Wear is always non-returnable, so it isn't Try & Buy."
-                  : isReturnable
-                    ? 'Returnable products are automatically Try & Buy.'
-                    : "Non-returnable products aren't eligible for Try & Buy."}
-              </Text>
+            </View>
 
-              <View style={[styles.infoBanner, { backgroundColor: colors.info10 }]}>
-                <Info size={16} color={colors.info} />
-                <Text style={[styles.infoBannerText, { color: colors.info }]}>
-                  Deal type (BOGO/Tiered/Free Shipping) is set by linking this product to a Deal
-                  from its Deals tab, not here.
+            <View>
+              <Text style={[styles.groupLabel, { color: colors.textSecondary }]}>DEALS</Text>
+              {shopDeals.length > 0 ? (
+                <>
+                  <SelectField
+                    label="Store-wide deal"
+                    placeholder="Select"
+                    value={excludeFromShopDeals ? 'No deal' : includeLabel}
+                    options={[includeLabel, 'No deal']}
+                    onSelect={v => setExcludeFromShopDeals(v === 'No deal')}
+                    colors={colors}
+                  />
+                  <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+                    {excludeFromShopDeals
+                      ? 'This product stays out of the store-wide deal. You can add it to a different deal later from its Deals tab, or leave it without one.'
+                      : 'Your store-wide deal is running — this product will be part of it.'}
+                  </Text>
+                </>
+              ) : (
+                <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+                  Link this product to a deal (BOGO, tiered, free shipping) from its Deals tab after saving.
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {step === 5 && (
+          <View style={styles.fields}>
+            <View>
+              <View style={styles.labelRow}>
+                <FieldLabel label="Photos" colors={colors} />
+                <Text style={[styles.counter, { color: colors.textLight }]}>
+                  {images.length}/{MAX_IMAGES}
                 </Text>
               </View>
-            </>
-          )}
+              <ProductImagePicker images={images} onChange={setImages} max={MAX_IMAGES} />
+              <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+                Select several at once. The first photo is the cover.
+              </Text>
+            </View>
 
-          {step === 5 && (
-            <>
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Media</Text>
-              <FieldLabel label="Product Images" colors={colors} />
-              <ProductImagePicker images={images} onChange={setImages} />
-
-              <View style={{ marginTop: Spacing.lg }}>
-                <FieldLabel label="Video URL (optional)" colors={colors} />
-                <View style={[styles.tagsField, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-                  <TextInput
-                    value={video}
-                    onChangeText={setVideo}
-                    placeholder="https://…"
-                    placeholderTextColor={colors.inputPlaceholder}
-                    style={[styles.tagsInput, { color: colors.textPrimary }]}
-                  />
-                </View>
-              </View>
-            </>
-          )}
-        </Card>
-
-        <View style={styles.footer}>
-          <Button label={step === 0 ? 'Cancel' : 'Back'} variant="outline" onPress={goBack} style={styles.footerButton} />
-          {step < STEPS.length - 1 ? (
-            <Button
-              label="Next"
-              onPress={goNext}
-              style={styles.footerButton}
-              rightIcon={<ChevronRight size={18} color={colors.buttonPrimaryText} />}
-            />
-          ) : (
-            <Button
-              label="Save as Draft"
-              onPress={handleSubmit}
-              loading={createMutation.isPending}
-              style={styles.footerButton}
-            />
-          )}
-        </View>
+            <View>
+              <FieldLabel label="Video URL (optional)" colors={colors} />
+              <PlainInput value={video} onChangeText={setVideo} placeholder="https://…" colors={colors} />
+            </View>
+          </View>
+        )}
       </FormScrollView>
 
+      {/* Pinned footer */}
+      <View style={[styles.footer, { borderTopColor: colors.divider, backgroundColor: colors.background }]}>
+        <Button
+          label={step === 0 ? 'Cancel' : 'Back'}
+          variant="outline"
+          onPress={goBack}
+          style={styles.footerSecondary}
+        />
+        <Button
+          label={isLast ? 'Save as draft' : 'Continue'}
+          onPress={isLast ? handleSubmit : goNext}
+          loading={isLast && createMutation.isPending}
+          style={styles.footerPrimary}
+        />
+      </View>
+
       <BottomSheet visible={attributeSheetOpen} onClose={() => setAttributeSheetOpen(false)}>
-        <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Add Attribute</Text>
-        <View style={styles.attributeSheetField}>
-          <FieldLabel label="Attribute name" colors={colors} />
-          <View style={[styles.tagsField, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-            <TextInput
-              value={attrKey}
-              onChangeText={setAttrKey}
-              placeholder="e.g. Material"
-              placeholderTextColor={colors.inputPlaceholder}
-              style={[styles.tagsInput, { color: colors.textPrimary }]}
-            />
-          </View>
+        <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Add detail</Text>
+        <View style={styles.sheetField}>
+          <FieldLabel label="Name" colors={colors} />
+          <PlainInput value={attrKey} onChangeText={setAttrKey} placeholder="e.g. Material" colors={colors} />
         </View>
-        <View style={styles.attributeSheetField}>
-          <FieldLabel label="Attribute value" colors={colors} />
-          <View style={[styles.tagsField, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-            <TextInput
-              value={attrValue}
-              onChangeText={setAttrValue}
-              placeholder="e.g. Cotton"
-              placeholderTextColor={colors.inputPlaceholder}
-              style={[styles.tagsInput, { color: colors.textPrimary }]}
-            />
-          </View>
+        <View style={styles.sheetField}>
+          <FieldLabel label="Value" colors={colors} />
+          <PlainInput value={attrValue} onChangeText={setAttrValue} placeholder="e.g. Cotton" colors={colors} />
         </View>
-        <Button label="Add" onPress={addAttribute} style={styles.attributeAddButton} />
+        <Button label="Add" onPress={addAttribute} style={styles.sheetButton} />
       </BottomSheet>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    padding: Spacing.lg,
-    paddingBottom: Spacing.xxxl,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
   },
-  backButton: {
+  headerIcon: {
     width: 40,
     height: 40,
-    borderRadius: Radius.full,
-    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -667,49 +708,50 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  title: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-  },
-  subtitle: {
-    marginTop: 2,
-    fontSize: FontSize.xs,
-  },
-  stepper: {
-    marginTop: Spacing.lg,
-  },
-  stepPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    borderWidth: 1,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    marginRight: Spacing.sm,
-  },
-  stepPillNumber: {
-    width: 16,
-    height: 16,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepPillNumberLabel: {
-    fontSize: FontSize.xxxs,
-    fontWeight: FontWeight.bold,
-  },
-  stepPillLabel: {
-    fontSize: FontSize.xs,
+  headerTitle: {
+    fontSize: FontSize.md,
     fontWeight: FontWeight.semibold,
   },
-  section: {
-    marginTop: Spacing.lg,
+  headerMeta: {
+    marginTop: 1,
+    fontSize: FontSize.xs,
   },
-  sectionTitle: {
-    fontSize: FontSize.lg,
+  progress: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  progressItem: {
+    flex: 1,
+  },
+  progressBar: {
+    height: 3,
+    borderRadius: Radius.full,
+  },
+  progressLabel: {
+    marginTop: Spacing.xs,
+    fontSize: FontSize.xxs,
+    textAlign: 'center',
+  },
+  content: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.huge,
+  },
+  stepTitle: {
+    fontSize: FontSize.xxxl,
     fontWeight: FontWeight.bold,
-    marginBottom: Spacing.md,
+    letterSpacing: -0.5,
+  },
+  stepHint: {
+    marginTop: Spacing.xs,
+    fontSize: FontSize.sm,
+  },
+  fields: {
+    marginTop: Spacing.xxl,
+    gap: Spacing.lg,
   },
   row: {
     flexDirection: 'row',
@@ -718,157 +760,163 @@ const styles = StyleSheet.create({
   col: {
     flex: 1,
   },
+  plainInput: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    fontSize: FontSize.md,
+  },
   errorText: {
-    marginTop: -Spacing.sm,
-    marginBottom: Spacing.md,
+    marginTop: Spacing.xs,
     fontSize: FontSize.xs,
   },
   helperText: {
-    marginTop: -Spacing.xs,
-    marginBottom: Spacing.sm,
+    marginTop: Spacing.sm,
+    fontSize: FontSize.xs,
+    lineHeight: 17,
+  },
+  groupLabel: {
+    marginBottom: Spacing.xs,
+    fontSize: FontSize.xxs,
+    fontWeight: FontWeight.semibold,
+    letterSpacing: 1,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  counter: {
     fontSize: FontSize.xs,
   },
-  sheetTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    marginBottom: Spacing.sm,
+  listHeader: {
+    flexDirection: 'row',
+    marginBottom: -Spacing.sm,
   },
-  tagsField: {
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    minHeight: 48,
-    justifyContent: 'center',
-    marginBottom: Spacing.lg,
+  listHeaderLabel: {
+    flex: 1,
+    fontSize: FontSize.xxs,
+    fontWeight: FontWeight.semibold,
+    letterSpacing: 1,
   },
-  tagsInput: {
-    paddingHorizontal: Spacing.md,
-    fontSize: FontSize.md,
+  listHeaderStock: {
+    flex: 0,
+    width: 96,
+    marginRight: 36,
   },
   variantRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    marginBottom: Spacing.sm,
   },
-  variantSizeInput: {
+  sizeField: {
     flex: 1,
-    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    height: 48,
+  },
+  sizeValue: {
+    flex: 1,
+    fontSize: FontSize.md,
+  },
+  stockInput: {
+    width: 96,
+    height: 48,
     borderWidth: 1,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
     fontSize: FontSize.md,
-  },
-  variantSizePicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  variantSizeValue: {
-    flex: 1,
-    fontSize: FontSize.md,
-    marginRight: Spacing.xs,
-  },
-  sizeSheetList: {
-    maxHeight: 360,
-  },
-  sizeSheetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
-  },
-  sizeSheetRowLabel: {
-    fontSize: FontSize.md,
-  },
-  variantStockInput: {
-    width: 90,
-    height: 44,
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    fontSize: FontSize.md,
+    textAlign: 'center',
   },
   variantRemove: {
-    padding: Spacing.xs,
+    width: 28,
+    alignItems: 'center',
   },
-  addVariantButton: {
+  disabled: {
+    opacity: 0.3,
+  },
+  textAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    alignSelf: 'flex-start',
     gap: Spacing.xs,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.md,
-    marginTop: Spacing.xs,
+    paddingVertical: Spacing.sm,
   },
-  addVariantLabel: {
+  textActionLabel: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
   },
-  addAttributesButton: {
+  summaryRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.md,
-    marginBottom: Spacing.md,
+    justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: Spacing.md,
   },
-  addAttributesLabel: {
+  summaryLabel: {
     fontSize: FontSize.sm,
+  },
+  summaryValue: {
+    fontSize: FontSize.md,
     fontWeight: FontWeight.semibold,
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xs,
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
     borderWidth: 1,
     borderRadius: Radius.full,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xxs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
   },
   chipLabel: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.medium,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    marginVertical: Spacing.md,
-  },
-  infoBanner: {
-    marginTop: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-  },
-  infoBannerText: {
-    flex: 1,
-    fontSize: FontSize.xs,
-    lineHeight: 18,
+    fontSize: FontSize.sm,
   },
   footer: {
-    marginTop: Spacing.xl,
     flexDirection: 'row',
     gap: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  footerButton: {
+  footerSecondary: {
     flex: 1,
   },
-  attributeSheetField: {
-    marginBottom: Spacing.sm,
+  footerPrimary: {
+    flex: 2,
   },
-  attributeAddButton: {
+  sheetTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.semibold,
+    marginBottom: Spacing.md,
+  },
+  sheetList: {
+    maxHeight: 360,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  sheetRowLabel: {
+    fontSize: FontSize.md,
+  },
+  sheetField: {
+    marginBottom: Spacing.md,
+  },
+  sheetButton: {
     marginTop: Spacing.sm,
   },
 });

@@ -33,28 +33,37 @@ export function ProductImagePicker({ images, onChange, max = 6 }: ProductImagePi
     const result = await launchImageLibrary({
       mediaType: 'photo',
       quality: 0.8,
-      selectionLimit: 1,
+      // Several at once, up to the remaining slots.
+      selectionLimit: max - images.length,
       maxWidth: 1280,
       maxHeight: 1280,
     });
     if (result.didCancel) return;
 
-    const asset = result.assets?.[0];
-    if (!asset?.uri) {
+    const assets = (result.assets ?? []).filter(asset => asset.uri);
+    if (assets.length === 0) {
       toast.show({ type: 'error', title: "Couldn't read that image" });
       return;
     }
 
     setProcessing(true);
     try {
-      const uploaded = await uploadSellerImage({
-        uri: asset.uri,
-        type: asset.type ?? 'image/jpeg',
-        name: asset.fileName ?? `photo-${Date.now()}.jpg`,
-      });
-      onChange([...images, uploaded]);
-    } catch {
-      toast.show({ type: 'error', title: 'Image upload failed' });
+      const results = await Promise.allSettled(
+        assets.map((asset, i) =>
+          uploadSellerImage({
+            uri: asset.uri!,
+            type: asset.type ?? 'image/jpeg',
+            name: asset.fileName ?? `photo-${Date.now()}-${i}.jpg`,
+          }),
+        ),
+      );
+      const uploaded = results.flatMap(r => (r.status === 'fulfilled' ? [r.value] : []));
+      if (uploaded.length > 0) onChange([...images, ...uploaded].slice(0, max));
+
+      const failed = results.length - uploaded.length;
+      if (failed > 0) {
+        toast.show({ type: 'error', title: `${failed} image${failed > 1 ? 's' : ''} failed to upload` });
+      }
     } finally {
       setProcessing(false);
     }

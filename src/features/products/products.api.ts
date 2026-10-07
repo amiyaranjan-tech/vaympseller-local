@@ -105,6 +105,9 @@ export interface ProductPayload {
   isBogo?: boolean;
   tryAndBuy?: boolean;
   isReturnable?: boolean;
+  // Opt-out of the shop's store-wide (entire_shop) deals — backend
+  // models/Product.js#excludeFromShopDeals.
+  excludeFromShopDeals?: boolean;
   dealType?: Product['dealType'];
   images?: ProductImage[];
   video?: string;
