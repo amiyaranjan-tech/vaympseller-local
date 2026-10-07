@@ -32,7 +32,6 @@ export const ENDPOINTS = {
     list: '/seller/orders',
     detail: (id: string) => `/seller/orders/${id}`,
     status: (id: string) => `/seller/orders/${id}/status`,
-    notifyRider: (id: string) => `/seller/orders/${id}/notify-rider`,
   },
   sellerNotifications: {
     registerDevice: '/seller/notifications/devices/register',

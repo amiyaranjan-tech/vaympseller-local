@@ -45,7 +45,6 @@ export interface OrderFulfillment {
   cancellationReason: string;
   // Set on Confirm (+5 min); the backend scheduler flips the order to
   // Packed once it passes.
-  autoPackAt: string | null;
   // Populated once a rider has accepted (see notify-rider/accept on the
   // backend); a bare id would mean it wasn't populated, which shouldn't
   // happen through this API's own endpoints.
@@ -120,18 +119,10 @@ export function acceptOrder(id: string): Promise<Order> {
   return updateOrderStatus(id, { sellerStatus: 'Confirmed' });
 }
 
+export function markOrderPacked(id: string): Promise<Order> {
+  return updateOrderStatus(id, { sellerStatus: 'Packed' });
+}
+
 export function rejectOrder(id: string, reason: string): Promise<Order> {
   return updateOrderStatus(id, { sellerStatus: 'Cancelled', cancellationReason: reason });
-}
-
-export interface NotifyRiderResult {
-  order: Order;
-  ridersNotified: number;
-}
-
-export function notifyRider(id: string): Promise<NotifyRiderResult> {
-  return request<NotifyRiderResult>({
-    url: ENDPOINTS.sellerOrders.notifyRider(id),
-    method: 'POST',
-  });
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -19,8 +19,8 @@ import { ROUTES, type MainStackParamList } from '../../../navigation/routeConfig
 import {
   getOrder,
   acceptOrder,
+  markOrderPacked,
   rejectOrder,
-  notifyRider,
   type OrderFulfillmentStatus,
 } from '../orders.api';
 
@@ -58,31 +58,19 @@ export function OrderDetailScreen() {
   const [rejectSheetOpen, setRejectSheetOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
 
-  const [now, setNow] = useState(Date.now());
 
   const orderQuery = useQuery({
     queryKey: ['seller-orders', 'detail', orderId],
     queryFn: () => getOrder(orderId),
-    // Once the pack window has run out, poll until the backend scheduler
-    // (30s tick) flips the order to Packed and the Notify rider button shows.
+    // Riders are notified automatically on Accept — poll until one accepts
+    // so their details appear without a manual refresh.
     refetchInterval: query => {
       const f = query.state.data?.fulfillment;
-      return f?.sellerStatus === 'Confirmed' && f.autoPackAt && new Date(f.autoPackAt).getTime() <= Date.now()
-        ? 5000
+      return f?.riderOfferedAt && !f.rider && (f.sellerStatus === 'Confirmed' || f.sellerStatus === 'Packed')
+        ? 10000
         : false;
     },
   });
-
-  const autoPackAt = orderQuery.data?.fulfillment.sellerStatus === 'Confirmed'
-    ? orderQuery.data.fulfillment.autoPackAt
-    : null;
-  useEffect(() => {
-    if (!autoPackAt) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [autoPackAt]);
-  const packMsLeft = autoPackAt ? Math.max(0, new Date(autoPackAt).getTime() - now) : 0;
-  const packCountdown = `${Math.floor(packMsLeft / 60000)}:${String(Math.floor(packMsLeft / 1000) % 60).padStart(2, '0')}`;
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['seller-orders'] });
@@ -91,7 +79,7 @@ export function OrderDetailScreen() {
   const acceptMutation = useMutation({
     mutationFn: () => acceptOrder(orderId),
     onSuccess: () => {
-      toast.show({ type: 'success', title: 'Order confirmed' });
+      toast.show({ type: 'success', title: 'Order confirmed', message: 'Nearby riders have been notified.' });
       invalidate();
     },
     onError: (error: Error) =>
@@ -110,18 +98,14 @@ export function OrderDetailScreen() {
       toast.show({ type: 'error', title: "Couldn't reject order", message: error.message }),
   });
 
-  const notifyRiderMutation = useMutation({
-    mutationFn: () => notifyRider(orderId),
-    onSuccess: result => {
-      toast.show({
-        type: 'success',
-        title: 'Riders notified',
-        message: `${result.ridersNotified} rider(s) notified — first to accept gets the pickup.`,
-      });
+  const packMutation = useMutation({
+    mutationFn: () => markOrderPacked(orderId),
+    onSuccess: () => {
+      toast.show({ type: 'success', title: 'Marked as packed' });
       invalidate();
     },
     onError: (error: Error) =>
-      toast.show({ type: 'error', title: "Couldn't notify riders", message: error.message }),
+      toast.show({ type: 'error', title: "Couldn't mark as packed", message: error.message }),
   });
 
   const order = orderQuery.data;
@@ -181,7 +165,8 @@ export function OrderDetailScreen() {
                   </Text>
                 </View>
               </Card>
-            ) : fulfillment.sellerStatus === 'Packed' && fulfillment.riderOfferedAt ? (
+            ) : fulfillment.riderOfferedAt &&
+              (fulfillment.sellerStatus === 'Confirmed' || fulfillment.sellerStatus === 'Packed') ? (
               <Card style={styles.waitingCard}>
                 <Text style={[styles.waitingText, { color: colors.textSecondary }]}>
                   Riders notified — waiting for one to accept the pickup.
@@ -318,23 +303,12 @@ export function OrderDetailScreen() {
         </View>
       )}
 
-      {autoPackAt && (
-        <View style={[styles.footer, styles.packFooter, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
-          <Text style={[styles.packLabel, { color: colors.textSecondary }]}>
-            {packMsLeft > 0 ? 'Pack the order — Notify rider unlocks in' : 'Getting ready for pickup…'}
-          </Text>
-          {packMsLeft > 0 && (
-            <Text style={[styles.packTimer, { color: colors.textPrimary }]}>{packCountdown}</Text>
-          )}
-        </View>
-      )}
-
-      {fulfillment?.sellerStatus === 'Packed' && !fulfillment.rider && (
+      {fulfillment?.sellerStatus === 'Confirmed' && (
         <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
           <Button
-            label={fulfillment.riderOfferedAt ? 'Notify riders again' : 'Notify rider'}
-            onPress={() => notifyRiderMutation.mutate()}
-            loading={notifyRiderMutation.isPending}
+            label="Mark as Packed"
+            onPress={() => packMutation.mutate()}
+            loading={packMutation.isPending}
             style={styles.footerButtonFull}
           />
         </View>
@@ -534,19 +508,6 @@ const styles = StyleSheet.create({
   },
   footerButtonFull: {
     flex: 1,
-  },
-  packFooter: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: Spacing.xxs,
-  },
-  packLabel: {
-    fontSize: FontSize.sm,
-  },
-  packTimer: {
-    fontSize: FontSize.xxl,
-    fontWeight: FontWeight.bold,
-    fontVariant: ['tabular-nums'],
   },
   sheetTitle: {
     fontSize: FontSize.lg,
