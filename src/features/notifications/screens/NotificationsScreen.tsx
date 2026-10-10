@@ -17,7 +17,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '../notifications.api';
-import { GROUPS, TYPE_META, type Group, NotificationRow } from '../notificationDisplay';
+import { GROUPS, typeMeta, type Group, NotificationRow } from '../notificationDisplay';
 import { navigateFromNotification } from '../notificationNavigation';
 
 type Nav = NativeStackNavigationProp<MainStackParamList, 'Notifications'>;
@@ -36,14 +36,14 @@ export function NotificationsScreen() {
 
   const items = query.data?.items ?? [];
   const unreadCount = items.filter(n => !n.isRead).length;
-  const filtered = group === 'All' ? items : items.filter(n => TYPE_META[n.type].group === group);
+  const filtered = group === 'All' ? items : items.filter(n => typeMeta(n.type).group === group);
 
   const groupCounts: Record<Group, number> = {
     All: items.length,
-    Orders: items.filter(n => TYPE_META[n.type].group === 'Orders').length,
-    Products: items.filter(n => TYPE_META[n.type].group === 'Products').length,
-    Finance: items.filter(n => TYPE_META[n.type].group === 'Finance').length,
-    System: items.filter(n => TYPE_META[n.type].group === 'System').length,
+    Orders: items.filter(n => typeMeta(n.type).group === 'Orders').length,
+    Products: items.filter(n => typeMeta(n.type).group === 'Products').length,
+    Finance: items.filter(n => typeMeta(n.type).group === 'Finance').length,
+    System: items.filter(n => typeMeta(n.type).group === 'System').length,
   };
 
   const markReadMutation = useMutation({

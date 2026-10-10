@@ -34,9 +34,10 @@ const SOUND_NAME = 'notification_sound';
 // The backend sends new_order as a DATA-ONLY push, so the app itself draws
 // it (displayNewOrderAlert) in every state — foreground, background and
 // killed. A fresh channel id: Android fixes a channel's sound at creation,
-// and the old "new_order" channel was created with the previous sound.
-const NEW_ORDER_CHANNEL_ID = 'new_order_alert';
-const LEGACY_NEW_ORDER_CHANNEL_ID = 'new_order';
+// and older channels were created with previous sounds — bump the id on
+// every sound change and add the old one to LEGACY_NEW_ORDER_CHANNEL_IDS.
+const NEW_ORDER_CHANNEL_ID = 'new_order_alert_v2';
+const LEGACY_NEW_ORDER_CHANNEL_IDS = ['new_order', 'new_order_alert'];
 const NEW_ORDER_SOUND_NAME = 'new_order_sound';
 
 let channelsReady: Promise<void> | null = null;
@@ -62,7 +63,7 @@ export function ensureChannels(): Promise<void> {
         sound: NEW_ORDER_SOUND_NAME,
         vibration: true,
       }),
-      notifee.deleteChannel(LEGACY_NEW_ORDER_CHANNEL_ID),
+      ...LEGACY_NEW_ORDER_CHANNEL_IDS.map(id => notifee.deleteChannel(id)),
     ])
       .then(() => undefined)
       .catch(error => {

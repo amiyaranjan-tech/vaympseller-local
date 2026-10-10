@@ -10,6 +10,7 @@ import {
   RotateCcw,
   ShieldCheck,
   ShoppingBag,
+  Heart,
   Wallet,
 } from 'lucide-react-native';
 
@@ -53,7 +54,12 @@ export const TYPE_META: Record<
     group: 'System',
   },
   offer_expiring: { icon: Percent, tint: c => c.error, badge: 'Offers', group: 'System' },
+  product_interest: { icon: Heart, tint: c => c.accent, badge: 'Products', group: 'Products' },
 };
+
+// A type the backend added after this build shipped must not crash the inbox.
+const FALLBACK_META = TYPE_META.verification_update;
+export const typeMeta = (type: string) => TYPE_META[type as NotificationType] ?? FALLBACK_META;
 
 export function timeAgo(iso: string): string {
   const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -75,7 +81,7 @@ export function NotificationRow({
   colors: Colors;
   onPress: () => void;
 }) {
-  const meta = TYPE_META[item.type];
+  const meta = typeMeta(item.type);
   const Icon = meta.icon;
   const tint = meta.tint(colors);
 

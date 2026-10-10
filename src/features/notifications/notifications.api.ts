@@ -15,6 +15,7 @@ export const NOTIFICATION_TYPES = [
   'payout_completed',
   'verification_update',
   'offer_expiring',
+  'product_interest',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
