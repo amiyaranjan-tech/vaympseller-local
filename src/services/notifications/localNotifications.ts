@@ -112,12 +112,11 @@ export async function displayForegroundNotification({
 
 const newOrderAlertId = (orderId: string) => `new_order_${orderId}`;
 
-// The new-order alert: its sound LOOPS (Android's insistent flag) until
-// the seller has SEEN it — Android stops the loop once they pull down the
-// notification shade, tapping/swiping removes it, and opening the app
-// clears it (stopAllNewOrderAlerts, notificationService.ts). Accepting/
-// rejecting (here or on another device, via the backend's
-// "new_order_handled" push) also clears it.
+// The new-order alert: its sound LOOPS (Android's insistent flag) and it
+// can't be swiped away, until the order is accepted/rejected — then
+// stopNewOrderAlert cancels it (from the app, or via the backend's
+// "new_order_handled" push when it's handled elsewhere). Android itself
+// also stops the looping once the seller opens the notification shade.
 export async function displayNewOrderAlert(data: Record<string, string>) {
   try {
     await ensureChannels();
@@ -135,7 +134,8 @@ export async function displayNewOrderAlert(data: Record<string, string>) {
         pressAction: { id: 'default', launchActivity: 'default' },
         sound: NEW_ORDER_SOUND_NAME,
         loopSound: true,
-        autoCancel: true,
+        ongoing: true,
+        autoCancel: false,
       },
     });
   } catch (error) {
@@ -145,20 +145,6 @@ export async function displayNewOrderAlert(data: Record<string, string>) {
 
 export function stopNewOrderAlert(orderId: string) {
   notifee.cancelNotification(newOrderAlertId(orderId)).catch(() => undefined);
-}
-
-/** The seller opened the app — every pending new-order alert counts as seen. */
-export async function stopAllNewOrderAlerts() {
-  try {
-    const displayed = await notifee.getDisplayedNotifications();
-    await Promise.all(
-      displayed
-        .filter(n => n.id?.startsWith(newOrderAlertId('')))
-        .map(n => notifee.cancelNotification(n.id!)),
-    );
-  } catch (error) {
-    console.log('[localNotifications] stopAllNewOrderAlerts failed', error);
-  }
 }
 
 // Data-only pushes (new_order / new_order_handled) — the same handling for
