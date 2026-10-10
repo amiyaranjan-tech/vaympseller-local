@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { useAuthStore } from '../../store/useAuthStore';
 import * as notificationsApi from '../../api/notifications.api';
@@ -20,6 +20,7 @@ import {
   ensureChannels,
   handleOrderAlertData,
   initLocalNotificationTapHandling,
+  stopAllNewOrderAlerts,
 } from './localNotifications';
 
 /**
@@ -182,6 +183,14 @@ export function initNotifications() {
   });
 
   initLocalNotificationTapHandling(data => handleMessageTap(data));
+
+  // Opening the app = the seller has seen their new orders — stop the
+  // looping alerts (a new order arriving while already in the app still
+  // loops until they tap/swipe it or pull down the shade).
+  void stopAllNewOrderAlerts();
+  AppState.addEventListener('change', state => {
+    if (state === 'active') void stopAllNewOrderAlerts();
+  });
 
   onNotificationOpenedApp(message => handleMessageTap(message.data as Record<string, string> | undefined));
 
