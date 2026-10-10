@@ -25,16 +25,16 @@ import { PricingBreakdown, discountedPrice } from '../PricingBreakdown';
 type Colors = ReturnType<typeof useThemeColors>['colors'];
 
 // Mirrors the admin panel's own product wizard (src/pages/products/
-// ProductForm.tsx) step-for-step — Basics/Pricing/Inventory/Attributes/
-// Offers/Media — so a seller's flow matches what an admin sees when
+// ProductForm.tsx) step-for-step — Media/Basics/Pricing/Inventory/
+// Attributes/Offers — so a seller's flow matches what an admin sees when
 // editing the same product.
 const STEPS = [
+  { label: 'Media', hint: 'Photos sell — add a few good ones.' },
   { label: 'Basics', hint: 'Name it and place it in the catalog.' },
   { label: 'Pricing', hint: 'Set the MRP and your discount.' },
   { label: 'Inventory', hint: 'Sizes and how many you have of each.' },
   { label: 'Attributes', hint: 'Details shoppers filter by.' },
   { label: 'Offers', hint: 'Highlights, returns and deals.' },
-  { label: 'Media', hint: 'Photos sell — add a few good ones.' },
 ];
 
 const MAX_IMAGES = 8;
@@ -246,17 +246,17 @@ export function AddProductScreen() {
   const validateStep = (index: number): boolean => {
     const nextErrors: Record<string, boolean> = {};
 
-    if (index === 0) {
+    if (index === 1) {
       nextErrors.name = !name.trim();
       nextErrors.description = !description.trim();
       nextErrors.gender = !gender;
       nextErrors.category = !category;
       nextErrors.subcategory = !subcategory;
-    } else if (index === 1) {
+    } else if (index === 2) {
       nextErrors.sellingPrice = !(Number(sellingPrice) > 0);
       nextErrors.discountPercent =
         !discountPercent.trim() || !(Number(discountPercent) >= 0 && Number(discountPercent) <= 100);
-    } else if (index === 2) {
+    } else if (index === 3) {
       nextErrors.variants = variants.length === 0 || variants.some(v => !v.size.trim());
     }
 
@@ -326,7 +326,7 @@ export function AddProductScreen() {
   };
 
   const handleSubmit = () => {
-    for (const i of [0, 1, 2]) {
+    for (const i of [1, 2, 3]) {
       if (!validateStep(i)) {
         setStep(i);
         toast.show({ type: 'error', title: 'Some required fields are missing' });
@@ -417,7 +417,7 @@ export function AddProductScreen() {
         <Text style={[styles.stepTitle, { color: colors.textPrimary }]}>{STEPS[step].label}</Text>
         <Text style={[styles.stepHint, { color: colors.textSecondary }]}>{STEPS[step].hint}</Text>
 
-        {step === 0 && (
+        {step === 1 && (
           <View style={styles.fields}>
             <View>
               <FieldLabel label="Product name" required colors={colors} />
@@ -489,7 +489,7 @@ export function AddProductScreen() {
           </View>
         )}
 
-        {step === 1 && (
+        {step === 2 && (
           <View style={styles.fields}>
             <View style={styles.row}>
               <View style={styles.col}>
@@ -509,7 +509,7 @@ export function AddProductScreen() {
           </View>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <View style={styles.fields}>
             <View style={styles.listHeader}>
               <Text style={[styles.listHeaderLabel, { color: colors.textSecondary }]}>SIZE</Text>
@@ -560,7 +560,7 @@ export function AddProductScreen() {
           </View>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <View style={styles.fields}>
             <View style={styles.row}>
               <View style={styles.col}>
@@ -596,7 +596,7 @@ export function AddProductScreen() {
           </View>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <View style={styles.fields}>
             <View>
               <Text style={[styles.groupLabel, { color: colors.textSecondary }]}>HIGHLIGHTS</Text>
@@ -651,7 +651,7 @@ export function AddProductScreen() {
           </View>
         )}
 
-        {step === 5 && (
+        {step === 0 && (
           <View style={styles.fields}>
             <View>
               <View style={styles.labelRow}>
