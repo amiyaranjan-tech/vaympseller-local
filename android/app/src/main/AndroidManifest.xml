@@ -7,6 +7,14 @@
          see src/services/notifications/notificationPermissions.ts) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- New-order alarm: Notifee's foreground service keeps the app alive
+         while OrderAlarmModule loops the sound until the order is handled
+         (see src/services/notifications/localNotifications.ts). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -56,5 +64,12 @@
           android:name="com.google.firebase.messaging.default_notification_channel_id"
           android:value="default"
           tools:replace="android:value" />
+      <!-- Notifee declares this as shortService (3-minute cap); the order
+           alarm plays audio until the seller acts, so mediaPlayback. -->
+      <service
+          android:name="app.notifee.core.ForegroundService"
+          android:exported="false"
+          android:foregroundServiceType="mediaPlayback"
+          tools:replace="android:foregroundServiceType" />
     </application>
 </manifest>

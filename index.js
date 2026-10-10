@@ -25,6 +25,16 @@ try {
     handleOrderAlertData(message.data);
   });
 
+  // The new-order alarm's foreground service: loops the order sound until
+  // every waiting order is handled — stopAllNewOrderAlerts() ends it. The
+  // promise deliberately never resolves (resolving stops the service).
+  require('@notifee/react-native').default.registerForegroundService(
+    () =>
+      new Promise(() => {
+        require('./src/services/notifications/localNotifications').startOrderAlarmSound();
+      }),
+  );
+
   // Tapping a Notifee-drawn notification (the new-order alert) while the
   // app is in the background — open that order.
   const notifee = require('@notifee/react-native').default;

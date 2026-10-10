@@ -12,6 +12,7 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import { ToastProvider } from './src/components/feedback/Toast';
 import { initNotifications } from './src/services/notifications/notificationService';
 import { queryClient } from './src/api/queryClient';
+import { IncomingOrderAlert } from './src/features/orders/components/IncomingOrderAlert';
 
 function App() {
   useEffect(() => {
@@ -24,6 +25,7 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <ToastProvider>
             <AppNavigator />
+            <IncomingOrderAlert />
           </ToastProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

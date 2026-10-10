@@ -77,7 +77,7 @@ export function OrderDetailScreen() {
   // elsewhere, or cancelled) — silence its looping new-order alert.
   const sellerStatus = orderQuery.data?.fulfillment.sellerStatus;
   useEffect(() => {
-    if (sellerStatus && sellerStatus !== 'Pending') stopNewOrderAlert(orderId);
+    if (sellerStatus && sellerStatus !== 'Pending') void stopNewOrderAlert(orderId);
   }, [sellerStatus, orderId]);
 
   const invalidate = () => {
