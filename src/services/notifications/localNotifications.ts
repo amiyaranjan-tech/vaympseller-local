@@ -139,8 +139,13 @@ async function showAlarm(pending: string[], data: Record<string, string>) {
       smallIcon: 'ic_notification',
       color: '#4342FF',
       importance: AndroidImportance.HIGH,
-      asForegroundService: true,
-      foregroundServiceTypes: [AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK],
+      // Only on a build that has the native alarm (and with it the manifest's
+      // mediaPlayback service type) — an older installed build running newer
+      // JS would otherwise be killed by Android for the type mismatch.
+      asForegroundService: Boolean(OrderAlarm),
+      foregroundServiceTypes: OrderAlarm
+        ? [AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK]
+        : undefined,
       ongoing: true,
       autoCancel: false,
       onlyAlertOnce: true,
