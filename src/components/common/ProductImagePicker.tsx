@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet } from 'react-native';
 import { GestureDetector, ScrollView, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -77,6 +77,7 @@ export function ProductImagePicker({ images, onChange, max = 6 }: ProductImagePi
   const toast = useToast();
   const [processing, setProcessing] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const handleAdd = async () => {
     if (processing || images.length >= max) return;
@@ -148,7 +149,9 @@ export function ProductImagePicker({ images, onChange, max = 6 }: ProductImagePi
           onDragStart={() => setDragging(true)}
           onDrop={handleDrop}
         >
-          <Image source={{ uri: img.url }} style={styles.image} />
+          <Pressable onPress={() => setPreviewUrl(img.url)}>
+            <Image source={{ uri: img.url }} style={styles.image} />
+          </Pressable>
           <Pressable
             onPress={() => handleRemove(img.publicId)}
             hitSlop={8}
@@ -172,6 +175,27 @@ export function ProductImagePicker({ images, onChange, max = 6 }: ProductImagePi
           )}
         </Pressable>
       )}
+
+      <Modal
+        visible={previewUrl !== null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setPreviewUrl(null)}
+      >
+        <Pressable style={styles.previewBackdrop} onPress={() => setPreviewUrl(null)}>
+          {previewUrl && (
+            <Image source={{ uri: previewUrl }} style={styles.previewImage} resizeMode="contain" />
+          )}
+          <Pressable
+            onPress={() => setPreviewUrl(null)}
+            hitSlop={12}
+            style={styles.previewClose}
+          >
+            <X size={24} color="#fff" />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -191,13 +215,28 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     position: 'absolute',
-    top: -6,
-    right: -6,
+    top: 4,
+    right: 4,
     width: 20,
     height: 20,
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  previewBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewImage: {
+    width: '100%',
+    height: '80%',
+  },
+  previewClose: {
+    position: 'absolute',
+    top: 48,
+    right: 20,
   },
   addTile: {
     width: TILE,
