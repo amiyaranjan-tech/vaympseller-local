@@ -662,7 +662,7 @@ export function AddProductScreen() {
               </View>
               <ProductImagePicker images={images} onChange={setImages} max={MAX_IMAGES} />
               <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-                Select several at once. The first photo is the cover.
+                Select several at once. Long-press and drag to reorder — the first photo is the cover.
               </Text>
             </View>
 
