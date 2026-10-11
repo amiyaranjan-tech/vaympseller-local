@@ -30,6 +30,7 @@ import { useMe } from '../../auth/hooks/useMe';
 import { updateShopStatus } from '../../shop/shop.api';
 import { useUnreadNotificationsCount } from '../../notifications/useUnreadCount';
 import { getProducts } from '../../products/products.api';
+import { getOrders } from '../../orders/orders.api';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import {
@@ -67,12 +68,21 @@ function StatTile({
 }
 
 // ponytail: no /seller/dashboard endpoint exists yet (see the "Coming
-// soon" chart card below), so picking a period only changes the caption
-// text on the Revenue/Orders tiles for now — the values themselves stay
-// the seller's all-time totals. Wire this to real period-scoped numbers
-// once that endpoint lands.
+// soon" chart card below). Orders is period-scoped via the orders list's
+// own from filter; Revenue still shows the seller's stored all-time total.
+// Wire Revenue to real period-scoped numbers once that endpoint lands.
 const PERIOD_OPTIONS = ['Today', '3 Days', 'This Week', 'This Month', 'Last 6 Months'] as const;
 type Period = (typeof PERIOD_OPTIONS)[number];
+
+function periodStart(period: Period): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  if (period === '3 Days') d.setDate(d.getDate() - 2);
+  if (period === 'This Week') d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // Monday
+  if (period === 'This Month') d.setDate(1);
+  if (period === 'Last 6 Months') d.setMonth(d.getMonth() - 6);
+  return d;
+}
 
 type DashboardNav = BottomTabNavigationProp<MainTabParamList, 'Dashboard'>;
 
@@ -101,10 +111,20 @@ export function DashboardScreen() {
     staleTime: 30000,
   });
 
-  const isRefreshing = meQuery.isRefetching || productsCountQuery.isRefetching;
+  // seller.orders is a stored counter nothing in the backend increments —
+  // count the seller's real orders for the picked period instead.
+  const ordersCountQuery = useQuery({
+    queryKey: ['seller-orders', 'count', period],
+    queryFn: () => getOrders({ limit: 1, from: periodStart(period).toISOString() }),
+    staleTime: 30000,
+  });
+
+  const isRefreshing =
+    meQuery.isRefetching || productsCountQuery.isRefetching || ordersCountQuery.isRefetching;
   const onRefresh = () => {
     void meQuery.refetch();
     void productsCountQuery.refetch();
+    void ordersCountQuery.refetch();
   };
 
   const shopName = seller?.shopName ?? 'your shop';
@@ -225,9 +245,9 @@ export function DashboardScreen() {
           <StatTile
             icon={<ShoppingBag size={20} color={colors.info} />}
             tint={colors.info}
-            value={seller?.orders ?? 0}
+            value={ordersCountQuery.data?.pagination.total ?? 0}
             label="Orders"
-            caption={`-- vs ${period.toLowerCase()}`}
+            caption={period === 'Today' ? 'today' : `in ${period.toLowerCase()}`}
             captionColor={colors.textSecondary}
           />
           <StatTile
