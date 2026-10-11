@@ -12,7 +12,7 @@ import {
   onNotificationOpenedApp,
   getInitialNotification,
 } from './pushClient';
-import { ensureNotificationPermission } from './notificationPermissions';
+import { ensureFullScreenAlertPermission, ensureNotificationPermission } from './notificationPermissions';
 import notifee from '@notifee/react-native';
 
 import {
@@ -52,6 +52,7 @@ async function registerCurrentToken() {
 
   const granted = await ensureNotificationPermission();
   if (!granted) return;
+  void ensureFullScreenAlertPermission();
 
   const deviceToken = await getToken();
   if (!deviceToken) return;

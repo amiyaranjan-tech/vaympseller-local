@@ -1,7 +1,12 @@
 package com.vaympseller
 
+import android.app.NotificationManager
+import android.content.Intent
 import android.media.AudioAttributes
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
+import com.facebook.react.bridge.Promise
 import android.media.MediaPlayer
 import android.os.PowerManager
 import com.facebook.react.bridge.ReactApplicationContext
@@ -66,6 +71,24 @@ class OrderAlarmModule(private val context: ReactApplicationContext) :
       activity.setShowWhenLocked(enabled)
       activity.setTurnScreenOn(enabled)
     }
+  }
+
+  // Android 14+ only lets calling/alarm apps launch full-screen by default;
+  // anyone else needs the user's "Full screen notifications" toggle, or the
+  // new-order popup degrades to a heads-up banner when the app is closed.
+  @ReactMethod
+  fun canUseFullScreenIntent(promise: Promise) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return promise.resolve(true)
+    promise.resolve(context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent())
+  }
+
+  @ReactMethod
+  fun openFullScreenIntentSettings() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+    context.startActivity(
+      Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:${context.packageName}"))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
   }
 
   companion object {
