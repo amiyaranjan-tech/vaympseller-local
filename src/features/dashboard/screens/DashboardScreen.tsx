@@ -6,11 +6,10 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Bell,
-  ChartColumnIncreasing,
   Check,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
-  Clock3,
   IndianRupee,
   LayoutGrid,
   Package,
@@ -31,6 +30,7 @@ import { updateShopStatus } from '../../shop/shop.api';
 import { useUnreadNotificationsCount } from '../../notifications/useUnreadCount';
 import { getProducts } from '../../products/products.api';
 import { getOrders } from '../../orders/orders.api';
+import { timeAgo } from '../../notifications/notificationDisplay';
 import { Spacing, Radius } from '../../../theme/spacing';
 import { FontSize, FontWeight } from '../../../theme/typography';
 import {
@@ -119,12 +119,23 @@ export function DashboardScreen() {
     staleTime: 30000,
   });
 
+  const recentOrdersQuery = useQuery({
+    queryKey: ['seller-orders', 'recent'],
+    queryFn: () => getOrders({ limit: 5 }),
+    staleTime: 30000,
+  });
+  const recentOrders = recentOrdersQuery.data?.items ?? [];
+
   const isRefreshing =
-    meQuery.isRefetching || productsCountQuery.isRefetching || ordersCountQuery.isRefetching;
+    meQuery.isRefetching ||
+    productsCountQuery.isRefetching ||
+    ordersCountQuery.isRefetching ||
+    recentOrdersQuery.isRefetching;
   const onRefresh = () => {
     void meQuery.refetch();
     void productsCountQuery.refetch();
     void ordersCountQuery.refetch();
+    void recentOrdersQuery.refetch();
   };
 
   const shopName = seller?.shopName ?? 'your shop';
@@ -296,23 +307,53 @@ export function DashboardScreen() {
         </Pressable>
 
 
-        <Card style={styles.chartCard}>
-          <View style={styles.chartText}>
-            <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>
-              Recent orders & sales charts
-            </Text>
-            <Text style={[styles.chartBody, { color: colors.textSecondary }]}>
-              Coming soon — waiting on the{' '}
-              <Text style={{ color: colors.textLink }}>/seller/dashboard</Text> and{' '}
-              <Text style={{ color: colors.textLink }}>/seller/orders</Text> endpoints.
-            </Text>
-          </View>
-          <View style={[styles.chartGraphic, { backgroundColor: `${colors.accent}14` }]}>
-            <ChartColumnIncreasing size={28} color={colors.accent} />
-            <View style={[styles.chartClock, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Clock3 size={12} color={colors.textSecondary} />
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleRow}>
+            <View style={[styles.sectionIcon, { backgroundColor: colors.info10 }]}>
+              <ShoppingBag size={16} color={colors.info} />
             </View>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Recent orders</Text>
           </View>
+          <Pressable onPress={() => navigation.navigate(ROUTES.ORDERS)} hitSlop={8}>
+            <Text style={[styles.viewAll, { color: colors.textLink }]}>View all</Text>
+          </Pressable>
+        </View>
+
+        <Card style={styles.recentCard}>
+          {recentOrders.length === 0 ? (
+            <Text style={[styles.recentEmpty, { color: colors.textSecondary }]}>
+              {recentOrdersQuery.isLoading ? 'Loading…' : 'No orders yet'}
+            </Text>
+          ) : (
+            recentOrders.map((order, index) => (
+              <View key={order._id}>
+                <Pressable
+                  style={styles.recentRow}
+                  onPress={() =>
+                    navigation
+                      .getParent<NativeStackNavigationProp<MainStackParamList>>()
+                      ?.navigate(ROUTES.ORDER_DETAIL, { orderId: order._id })
+                  }
+                >
+                  <View style={[styles.recentIcon, { backgroundColor: `${colors.info}20` }]}>
+                    <Package size={20} color={colors.info} />
+                  </View>
+                  <View style={styles.recentContent}>
+                    <Text style={[styles.recentTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                      #{order.orderNumber} · {order.fulfillment.sellerStatus}
+                    </Text>
+                    <Text style={[styles.recentMeta, { color: colors.textSecondary }]}>
+                      ₹{order.total} · {timeAgo(order.createdAt)}
+                    </Text>
+                  </View>
+                  <ChevronRight size={20} color={colors.textLight} />
+                </Pressable>
+                {index < recentOrders.length - 1 && (
+                  <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+                )}
+              </View>
+            ))
+          )}
         </Card>
       </ScrollView>
 
@@ -546,40 +587,41 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     marginLeft: Spacing.lg + 44 + Spacing.md,
   },
-  chartCard: {
-    marginTop: Spacing.lg,
+  viewAll: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+  },
+  recentCard: {
+    padding: 0,
+    overflow: 'hidden',
+  },
+  recentEmpty: {
+    padding: Spacing.lg,
+    fontSize: FontSize.sm,
+    textAlign: 'center',
+  },
+  recentRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: Spacing.lg,
   },
-  chartText: {
-    flex: 1,
+  recentIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: Spacing.md,
   },
-  chartTitle: {
+  recentContent: {
+    flex: 1,
+  },
+  recentTitle: {
     fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
+    fontWeight: FontWeight.semibold,
   },
-  chartBody: {
-    marginTop: Spacing.xs,
+  recentMeta: {
+    marginTop: Spacing.xxs,
     fontSize: FontSize.sm,
-    lineHeight: 19,
-  },
-  chartGraphic: {
-    width: 76,
-    height: 76,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chartClock: {
-    position: 'absolute',
-    bottom: -6,
-    right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
