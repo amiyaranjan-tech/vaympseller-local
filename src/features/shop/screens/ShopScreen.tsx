@@ -9,6 +9,7 @@ import {
   CalendarDays,
   ChevronRight,
   ClipboardList,
+  Heart,
   Image as ImageIcon,
   Percent,
   Settings,
@@ -262,6 +263,13 @@ export function ShopScreen() {
             tint={colors.info}
             label="Manage Orders"
             onPress={() => navigation.navigate(ROUTES.ORDERS)}
+            colors={colors}
+          />
+          <QuickAction
+            icon={<Heart size={22} color={colors.accent} />}
+            tint={colors.accent}
+            label="Interested Customers"
+            onPress={() => mainStack?.navigate(ROUTES.INTERESTED_PRODUCTS)}
             colors={colors}
           />
           {isOwner && (

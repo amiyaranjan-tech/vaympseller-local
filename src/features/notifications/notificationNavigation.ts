@@ -33,11 +33,17 @@ export function navigateFromNotification(item: SellerNotification, navigation: M
     case 'product_approved':
     case 'low_stock':
     case 'out_of_stock':
-    case 'product_interest':
       if (productId) {
         navigation.navigate(ROUTES.PRODUCT_DETAILS, { productId });
       } else {
         navigation.navigate(ROUTES.MAIN_TABS, { screen: ROUTES.PRODUCTS });
+      }
+      return;
+    case 'product_interest':
+      if (productId) {
+        navigation.navigate(ROUTES.INTERESTED_PRODUCT_DETAIL, { productId });
+      } else {
+        navigation.navigate(ROUTES.INTERESTED_PRODUCTS);
       }
       return;
     case 'new_order':
