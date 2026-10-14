@@ -40,6 +40,8 @@ export interface Offer {
   startDate: string;
   endDate: string;
   priority: number;
+  // Admin id when an admin set this deal (view-only for the seller), null for the seller's own.
+  createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
