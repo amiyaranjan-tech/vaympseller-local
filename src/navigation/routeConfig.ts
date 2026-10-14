@@ -30,6 +30,7 @@ export const ROUTES = {
   MANAGE_HELPERS: 'ManageHelpers',
   INTERESTED_PRODUCTS: 'InterestedProducts',
   INTERESTED_PRODUCT_DETAIL: 'InterestedProductDetail',
+  DEAL_FORM: 'DealForm',
 
   // Bottom tabs
   DASHBOARD: 'Dashboard',
@@ -73,6 +74,8 @@ export type MainStackParamList = {
   ManageHelpers: undefined;
   InterestedProducts: undefined;
   InterestedProductDetail: { productId: string };
+  // kind picks the form; offerId edits; productId preselects that product.
+  DealForm: { kind: 'bogo' | 'tier'; offerId?: string; productId?: string };
 };
 
 // Root switch: unauthenticated -> Auth, authenticated but blocked (pending/

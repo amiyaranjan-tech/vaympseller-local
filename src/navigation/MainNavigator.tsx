@@ -18,6 +18,7 @@ import { ManageHelpersScreen } from '../features/staff/screens/ManageHelpersScre
 import { FinanceScreen } from '../features/finance/screens/FinanceScreen';
 import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
 import { DealsScreen } from '../features/deals/screens/DealsScreen';
+import { DealFormScreen } from '../features/deals/screens/DealFormScreen';
 import { InterestedProductsScreen } from '../features/interests/screens/InterestedProductsScreen';
 import { InterestedProductDetailScreen } from '../features/interests/screens/InterestedProductDetailScreen';
 import { useUnreadNewOrdersCount } from '../features/notifications/useUnreadNewOrdersCount';
@@ -106,6 +107,7 @@ export function MainNavigator() {
       <Stack.Screen name={ROUTES.NOTIFICATIONS} component={NotificationsScreen} />
       <Stack.Screen name={ROUTES.RETURNS} component={withBack('Returns')} />
       <Stack.Screen name={ROUTES.OFFERS} component={DealsScreen} />
+      <Stack.Screen name={ROUTES.DEAL_FORM} component={DealFormScreen} />
       <Stack.Screen name={ROUTES.INTERESTED_PRODUCTS} component={InterestedProductsScreen} />
       <Stack.Screen name={ROUTES.INTERESTED_PRODUCT_DETAIL} component={InterestedProductDetailScreen} />
       <Stack.Screen name={ROUTES.INVENTORY} component={withBack('Inventory')} />

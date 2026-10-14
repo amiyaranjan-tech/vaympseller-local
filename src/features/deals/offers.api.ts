@@ -27,7 +27,8 @@ export interface Offer {
   buyQuantity?: number;
   getQuantity?: number;
   getDiscountPercent?: number;
-  freeProductIds?: string[];
+  // Populated product previews on GET /:id, bare ids in the list.
+  freeProductIds?: (string | OfferProductRef)[];
   maximumFreeItems?: number | null;
   maximumDiscount?: number | null;
   seller: string;
