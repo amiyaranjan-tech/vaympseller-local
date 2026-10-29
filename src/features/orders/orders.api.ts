@@ -25,6 +25,8 @@ export interface OrderItem {
   originalPrice: number;
   isFreeItem: boolean;
   dealType: string | null;
+  // Customer cancelled this product before pickup — don't pack/pick it up.
+  cancelled?: boolean;
 }
 
 export interface OrderRider {

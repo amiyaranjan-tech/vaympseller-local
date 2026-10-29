@@ -215,7 +215,11 @@ export function OrderDetailScreen() {
                     onPress={() =>
                       item.product && navigation.navigate(ROUTES.PRODUCT_DETAILS, { productId: item.product })
                     }
-                    style={[styles.itemRow, index > 0 && { borderTopColor: colors.divider, borderTopWidth: StyleSheet.hairlineWidth }]}
+                    style={[
+                      styles.itemRow,
+                      index > 0 && { borderTopColor: colors.divider, borderTopWidth: StyleSheet.hairlineWidth },
+                      item.cancelled && { opacity: 0.5 },
+                    ]}
                   >
                     {item.image ? (
                       <Image source={{ uri: item.image }} style={styles.itemImage} />
@@ -240,6 +244,11 @@ export function OrderDetailScreen() {
                       {!!dealLabel && (
                         <View style={styles.dealBadgeRow}>
                           <Badge label={dealLabel} tone="warning" />
+                        </View>
+                      )}
+                      {item.cancelled && (
+                        <View style={styles.dealBadgeRow}>
+                          <Badge label="Cancelled by customer · don't pack" tone="error" />
                         </View>
                       )}
                     </View>
